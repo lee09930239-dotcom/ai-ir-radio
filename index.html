@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 製程法說會電台</title>
+<meta name="theme-color" content="#0f172a">
+<style>
+:root{--bg:#f8fafc;--fg:#0f172a;--mut:#64748b;--card:#fff;--line:#e2e8f0;--acc:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0f172a;--fg:#e2e8f0;--mut:#94a3b8;--card:#1e293b;--line:#334155;--acc:#60a5fa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:0 16px 140px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:1.4rem;margin:20px 0 4px}
+.sub{color:var(--mut);font-size:.9rem;margin:0 0 16px}
+h2{font-size:1.05rem;margin:24px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+.co{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.co b{display:block}
+.co small{color:var(--mut)}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+a.b,button{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--card);color:var(--acc);padding:6px 12px;border-radius:8px;text-decoration:none;cursor:pointer}
+button.p{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=text]{width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);margin:4px 0}
+.q{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.q span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q.on span{color:var(--acc);font-weight:600}
+#bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+#bar .in{max-width:760px;margin:0 auto}
+#now{font-size:.9rem;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+audio{width:100%}
+.note{font-size:.85rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>AI 製程法說會電台</h1>
+<p class="sub">依 AI 晶片製程階段整理各家公司的法說會入口，加上可關螢幕繼續播的播放清單。</p>
+
+<h2>播放清單（背景播放）</h2>
+<p class="note">法說會多半在公司官網或影音平台，網頁無法直接抓取播放。把錄音檔（mp3 / m4a）網址貼進來，或從手機選已下載的檔案，就能排隊播放，鎖屏後仍可用鎖屏介面控制。</p>
+<input type="text" id="name" placeholder="標題（例：東京威力 FY2026 Q2）">
+<input type="text" id="url" placeholder="音檔網址（https://…mp3）">
+<div class="links">
+<button class="p" id="add">加入清單</button>
+<label class="b" style="display:inline-block;padding:6px 12px;border:1px solid var(--line);border-radius:8px;color:var(--acc);cursor:pointer">選擇檔案<input type="file" id="file" accept="audio/*" multiple hidden></label>
+</div>
+<div id="list"></div>
+<p class="note" id="fnote" hidden>本機檔案只在這次開啟期間有效，重新開啟需再選一次。</p>
+
+<div id="dir"></div>
+<p class="note">連結為各公司官方 IR 入口，進去後找 Earnings / 決算説明 / 法說會。部分連結尚未逐一驗證，若失效請告訴我。</p>
+</main>
+
+<div id="bar"><div class="in">
+<div id="now">尚未播放</div>
+<audio id="au" controls preload="none"></audio>
+</div></div>
+
+<script>
+const DATA=[
+["設計 / EDA / IP",[
+["NVIDIA","GPU、AI 加速器","https://investor.nvidia.com/events-and-presentations/events-and-presentations/default.aspx"],
+["AMD","CPU / GPU","https://ir.amd.com/"],
+["Broadcom","客製 AI 晶片、網通","https://investors.broadcom.com/"],
+["Arm","IP 授權","https://investors.arm.com/"],
+["Synopsys","EDA / IP","https://investor.synopsys.com/"],
+["Cadence","EDA / IP","https://investor.cadence.com/"]]],
+["晶圓代工 / IDM",[
+["台積電 TSMC","先進製程代工","https://investor.tsmc.com/chinese"],
+["Intel","IDM + 代工","https://www.intc.com/"],
+["Samsung Electronics","代工 + 記憶體","https://www.samsung.com/global/ir/"]]],
+["製造設備",[
+["ASML","EUV 曝光","https://www.asml.com/en/investors"],
+["東京威力 Tokyo Electron","塗佈顯影、蝕刻、成膜","https://www.tel.com/ir/"],
+["Applied Materials","沉積、蝕刻","https://ir.appliedmaterials.com/"],
+["Lam Research","蝕刻、沉積","https://investor.lamresearch.com/"],
+["KLA","檢測、量測","https://ir.kla.com/"],
+["Lasertec","EUV 光罩檢測","https://www.lasertec.co.jp/en/ir/"],
+["DISCO","切割、研磨","https://www.disco.co.jp/eg/ir/"]]],
+["檢測 / 測試",[
+["愛德萬 Advantest","SoC 測試機","https://www.advantest.com/investors"],
+["Teradyne","測試設備","https://investors.teradyne.com/"]]],
+["材料 / 耗材",[
+["信越化學 Shin-Etsu","矽晶圓、光阻","https://www.shinetsu.co.jp/en/ir/"],
+["SUMCO","矽晶圓","https://www.sumcosi.com/english/ir/"],
+["聖暉集團","無塵室、特殊氣體與化學品供應系統工程","https://www.acter.com.tw/"]]],
+["封裝",[
+["日月光 ASE","先進封裝、測試","https://ase.aseglobal.com/ch/investors"],
+["Amkor","封測","https://ir.amkor.com/"]]],
+["記憶體",[
+["SK hynix","HBM","https://www.skhynix.com/eng/ir/"],
+["Micron","DRAM / HBM / NAND","https://investors.micron.com/"],
+["Kioxia","NAND","https://www.kioxia-holdings.com/en-jp/ir.html"]]]
+];
+const dir=document.getElementById('dir');
+for(const [t,cs] of DATA){
+  const h=document.createElement('h2');h.textContent=t;dir.append(h);
+  for(const [n,d,u] of cs){
+    const e=document.createElement('div');e.className='co';
+    const b=document.createElement('b');b.textContent=n;
+    const s=document.createElement('small');s.textContent=d;
+    const l=document.createElement('div');l.className='links';
+    const a=document.createElement('a');a.className='b';a.href=u;a.target='_blank';a.rel='noopener';a.textContent='法說會 / IR 頁面';
+    const y=document.createElement('a');y.className='b';y.target='_blank';y.rel='noopener';
+    y.href='https://www.youtube.com/results?search_query='+encodeURIComponent(n+' earnings call');y.textContent='YouTube 搜尋';
+    l.append(a,y);e.append(b,s,l);dir.append(e);
+  }
+}
+
+const au=document.getElementById('au'),now=document.getElementById('now'),list=document.getElementById('list');
+let q=[];let cur=-1;
+try{q=JSON.parse(localStorage.getItem('q')||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem('q',JSON.stringify(q.filter(x=>!x.local)))}catch(e){}};
+function render(){
+  list.innerHTML='';
+  q.forEach((x,i)=>{
+    const r=document.createElement('div');r.className='q'+(i===cur?' on':'');
+    const s=document.createElement('span');s.textContent=x.name;
+    const p=document.createElement('button');p.textContent='播放';p.onclick=()=>play(i);
+    const d=document.createElement('button');d.textContent='刪除';d.onclick=()=>{q.splice(i,1);if(cur>=i)cur--;save();render()};
+    r.append(s,p,d);list.append(r);
+  });
+  document.getElementById('fnote').hidden=!q.some(x=>x.local);
+}
+function play(i){
+  if(i<0||i>=q.length)return;
+  cur=i;au.src=q[i].url;au.play().catch(()=>{});now.textContent=q[i].name;
+  if('mediaSession' in navigator){
+    navigator.mediaSession.metadata=new MediaMetadata({title:q[i].name,artist:'AI 製程法說會電台'});
+  }
+  render();
+}
+au.addEventListener('ended',()=>play(cur+1));
+if('mediaSession' in navigator){
+  const ms=navigator.mediaSession;
+  ms.setActionHandler('play',()=>au.play());
+  ms.setActionHandler('pause',()=>au.pause());
+  ms.setActionHandler('previoustrack',()=>play(cur-1));
+  ms.setActionHandler('nexttrack',()=>play(cur+1));
+  try{ms.setActionHandler('seekbackward',()=>{au.currentTime=Math.max(0,au.currentTime-15)});
+  ms.setActionHandler('seekforward',()=>{au.currentTime+=30});}catch(e){}
+}
+document.getElementById('add').onclick=()=>{
+  const u=document.getElementById('url').value.trim();
+  if(!/^https?:\/\//.test(u))return alert('請貼上 https:// 開頭的音檔網址');
+  q.push({name:document.getElementById('name').value.trim()||u,url:u});
+  document.getElementById('name').value='';document.getElementById('url').value='';
+  save();render();
+};
+document.getElementById('file').onchange=e=>{
+  for(const f of e.target.files)q.push({name:f.name,url:URL.createObjectURL(f),local:true});
+  render();
+};
+render();
+</script>
+</body>
+</html>
