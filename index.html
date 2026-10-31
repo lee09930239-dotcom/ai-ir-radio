@@ -28,6 +28,7 @@ input[type=text]{width:100%;font:inherit;padding:8px;border:1px solid var(--line
 #bar .in{max-width:760px;margin:0 auto}
 #now{font-size:.9rem;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 audio{width:100%}
+.ytbox{position:relative;padding-top:56.25%}.ytbox iframe{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px}#ytwrap{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0}
 .note{font-size:.85rem;color:var(--mut)}
 </style>
 </head>
@@ -36,10 +37,11 @@ audio{width:100%}
 <h1>AI 製程法說會電台</h1>
 <p class="sub">依 AI 晶片製程階段整理各家公司的法說會入口，加上可關螢幕繼續播的播放清單。</p>
 
+<div id="ytwrap" hidden><div id="ytt" class="note"></div><div class="ytbox"><iframe id="yt" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div></div>
 <h2>播放清單（背景播放）</h2>
-<p class="note">法說會多半在公司官網或影音平台，網頁無法直接抓取播放。把錄音檔（mp3 / m4a）網址貼進來，或從手機選已下載的檔案，就能排隊播放，鎖屏後仍可用鎖屏介面控制。</p>
+<p class="note">法說會多半在公司官網或影音平台，網頁無法直接抓取播放。把 YouTube 連結或錄音檔（mp3 / m4a）網址貼進來，或從手機選已下載的檔案，就能排隊播放，鎖屏後仍可用鎖屏介面控制。</p>
 <input type="text" id="name" placeholder="標題（例：東京威力 FY2026 Q2）">
-<input type="text" id="url" placeholder="音檔網址（https://…mp3）">
+<input type="text" id="url" placeholder="音檔網址（mp3）或 YouTube 連結">
 <div class="links">
 <button class="p" id="add">加入清單</button>
 <label class="b" style="display:inline-block;padding:6px 12px;border:1px solid var(--line);border-radius:8px;color:var(--acc);cursor:pointer">選擇檔案<input type="file" id="file" accept="audio/*" multiple hidden></label>
@@ -103,11 +105,19 @@ for(const [t,cs] of DATA){
     const a=document.createElement('a');a.className='b';a.href=u;a.target='_blank';a.rel='noopener';a.textContent='法說會 / IR 頁面';
     const y=document.createElement('a');y.className='b';y.target='_blank';y.rel='noopener';
     y.href='https://www.youtube.com/results?search_query='+encodeURIComponent(n+' earnings call');y.textContent='YouTube 搜尋';
-    if(v){const w=document.createElement('a');w.className='b';w.target='_blank';w.rel='noopener';w.href=v;w.textContent='▶ '+vt;l.append(w);}
+    if(v){const w=document.createElement('button');w.className='p';w.textContent='▶ 在這裡播放：'+vt;w.onclick=()=>playYT(ytId(v),n+' '+vt);l.append(w);}
     l.append(a,y);e.append(b,s,l);dir.append(e);
   }
 }
 
+function ytId(u){const m=u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);return m&&m[1]}
+function playYT(id,title){
+  const au=document.getElementById('au');au.pause();
+  document.getElementById('ytwrap').hidden=false;
+  document.getElementById('ytt').textContent=title;
+  document.getElementById('yt').src='https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1&playsinline=1&rel=0';
+  document.getElementById('ytwrap').scrollIntoView({behavior:'smooth'});
+}
 const au=document.getElementById('au'),now=document.getElementById('now'),list=document.getElementById('list');
 let q=[];let cur=-1;
 try{q=JSON.parse(localStorage.getItem('q')||'[]')}catch(e){}
@@ -125,12 +135,16 @@ function render(){
 }
 function play(i){
   if(i<0||i>=q.length)return;
-  cur=i;au.src=q[i].url;au.play().catch(()=>{});now.textContent=q[i].name;
+  cur=i;
+  if(q[i].yt){au.pause();playYT(q[i].yt,q[i].name);now.textContent=q[i].name;render();return}
+  document.getElementById('yt').src='';document.getElementById('ytwrap').hidden=true;
+  au.src=q[i].url;au.play().catch(()=>{});now.textContent=q[i].name;
   if('mediaSession' in navigator){
     navigator.mediaSession.metadata=new MediaMetadata({title:q[i].name,artist:'AI 製程法說會電台'});
   }
   render();
 }
+au.addEventListener('play',()=>{document.getElementById('yt').src='';document.getElementById('ytwrap').hidden=true});
 au.addEventListener('ended',()=>play(cur+1));
 if('mediaSession' in navigator){
   const ms=navigator.mediaSession;
@@ -143,8 +157,9 @@ if('mediaSession' in navigator){
 }
 document.getElementById('add').onclick=()=>{
   const u=document.getElementById('url').value.trim();
-  if(!/^https?:\/\//.test(u))return alert('請貼上 https:// 開頭的音檔網址');
-  q.push({name:document.getElementById('name').value.trim()||u,url:u});
+  if(!/^https?:\/\//.test(u))return alert('請貼上 https:// 開頭的網址');
+  const nm=document.getElementById('name').value.trim()||u,id=ytId(u);
+  q.push(id?{name:nm,url:u,yt:id}:{name:nm,url:u});
   document.getElementById('name').value='';document.getElementById('url').value='';
   save();render();
 };
