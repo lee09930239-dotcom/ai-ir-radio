@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e3a8a"/><stop offset="1" stop-color="#0f172a"/></linearGradient></defs>
+<rect width="180" height="180" fill="url(#g)"/>
+<g stroke="#93c5fd" stroke-width="6" stroke-linecap="round">
+<line x1="70" y1="50" x2="70" y2="38"/><line x1="90" y1="50" x2="90" y2="38"/><line x1="110" y1="50" x2="110" y2="38"/>
+<line x1="70" y1="130" x2="70" y2="142"/><line x1="90" y1="130" x2="90" y2="142"/><line x1="110" y1="130" x2="110" y2="142"/>
+<line x1="50" y1="70" x2="38" y2="70"/><line x1="50" y1="90" x2="38" y2="90"/><line x1="50" y1="110" x2="38" y2="110"/>
+<line x1="130" y1="70" x2="142" y2="70"/><line x1="130" y1="90" x2="142" y2="90"/><line x1="130" y1="110" x2="142" y2="110"/>
+</g>
+<rect x="50" y="50" width="80" height="80" rx="12" fill="#2563eb" stroke="#bfdbfe" stroke-width="4"/>
+<circle cx="90" cy="98" r="7" fill="#fff"/>
+<g fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round">
+<path d="M78 86 a17 17 0 0 1 24 0"/><path d="M69 77 a30 30 0 0 1 42 0"/>
+</g>
+<text x="90" y="124" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="13" fill="#dbeafe">IR</text>
+</svg>
