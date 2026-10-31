@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI 製程法說會電台</title>
+<title>法說電台</title>
 <meta name="theme-color" content="#0f172a">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -13,7 +13,7 @@
 :root{--bg:#f8fafc;--fg:#0f172a;--mut:#64748b;--card:#fff;--line:#e2e8f0;--acc:#2563eb}
 @media(prefers-color-scheme:dark){:root{--bg:#0f172a;--fg:#e2e8f0;--mut:#94a3b8;--card:#1e293b;--line:#334155;--acc:#60a5fa}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:0 16px 160px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:0 16px 40px}
 main{max-width:760px;margin:0 auto}
 h1{font-size:1.4rem;margin:20px 0 4px}
 .sub{color:var(--mut);font-size:.9rem;margin:0 0 16px}
@@ -22,47 +22,25 @@ h2{font-size:1.05rem;margin:24px 0 8px;padding-top:8px;border-top:1px solid var(
 .co b{display:block}
 .co small{color:var(--mut)}
 .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-a.b,button{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--card);color:var(--acc);padding:6px 12px;border-radius:8px;text-decoration:none;cursor:pointer}
-button.p{background:var(--acc);color:#fff;border-color:var(--acc)}
-input[type=text]{width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);margin:4px 0}
-.q{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
-.q span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.q.on span{color:var(--acc);font-weight:600}
-#bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
-#bar .in{max-width:760px;margin:0 auto}
-#now{font-size:.9rem;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-audio{width:100%}
-.ytbox{position:relative;padding-top:56.25%}.ytbox iframe{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px}#ytwrap{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0}
+a.b{font-size:.9rem;border:1px solid var(--line);background:var(--card);color:var(--acc);padding:6px 12px;border-radius:8px;text-decoration:none}
+a.pk{display:block;background:var(--acc);color:#fff;text-decoration:none;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+a.pk small{display:block;opacity:.85}
 .note{font-size:.85rem;color:var(--mut)}
 </style>
 </head>
 <body>
 <main>
-<h1>AI 製程法說會電台</h1>
-<p class="sub">依 AI 晶片製程階段整理各家公司的法說會入口，加上可關螢幕繼續播的播放清單。</p>
-
-<div id="ytwrap" hidden><div id="ytt" class="note"></div><div class="ytbox"><iframe id="yt" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div></div>
-<h2>播放清單（背景播放）</h2>
-<p class="note">法說會多半在公司官網或影音平台，網頁無法直接抓取播放。把 YouTube 連結或錄音檔（mp3 / m4a）網址貼進來，或從手機選已下載的檔案，就能排隊播放，鎖屏後仍可用鎖屏介面控制。</p>
-<input type="text" id="name" placeholder="標題（例：東京威力 FY2026 Q2）">
-<input type="text" id="url" placeholder="音檔網址（mp3）或 YouTube 連結">
-<div class="links">
-<button class="p" id="add">加入清單</button>
-<label class="b" style="display:inline-block;padding:6px 12px;border:1px solid var(--line);border-radius:8px;color:var(--acc);cursor:pointer">選擇檔案<input type="file" id="file" accept="audio/*" multiple hidden></label>
-</div>
-<div id="list"></div>
-<p class="note" id="fnote" hidden>本機檔案只在這次開啟期間有效，重新開啟需再選一次。</p>
-
+<h1>法說電台</h1>
+<p class="sub">挑好的半導體法說會，點了用 YouTube App 打開，直接從重點開始聽。聽到哪裡由 YouTube 記住。</p>
+<h2>精選法說會</h2>
+<div id="picks"></div>
 <div id="dir"></div>
-<p class="note">連結為各公司官方 IR 入口，進去後找 Earnings / 決算説明 / 法說會。部分連結尚未逐一驗證，若失效請告訴我。</p>
+<p class="note">IR 連結為各公司官方入口，部分需要註冊。</p>
 </main>
-
-<div id="bar" hidden><div class="in">
-<div id="now">尚未播放</div>
-<audio id="au" controls preload="none"></audio>
-</div></div>
-
 <script>
+// 精選：[公司, 標題, YouTube 連結, 起始秒數, 語言]
+const PICKS=[
+];
 const DATA=[
 ["設計 / EDA / IP",[
 ["NVIDIA","GPU、AI 加速器","https://investor.nvidia.com/events-and-presentations/events-and-presentations/default.aspx"],
@@ -98,81 +76,34 @@ const DATA=[
 ["Micron","DRAM / HBM / NAND","https://investors.micron.com/"],
 ["Kioxia","NAND","https://www.kioxia-holdings.com/en-jp/ir.html"]]]
 ];
+
+const yt=(u,t)=>{const m=u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);return 'https://www.youtube.com/watch?v='+(m?m[1]:'')+(t?'&t='+t+'s':'')};
+const mmss=t=>Math.floor(t/60)+':'+String(t%60).padStart(2,'0');
+function pick(p){
+  const [co,title,u,t,lang]=p;
+  const a=document.createElement('a');a.className='pk';a.href=yt(u,t);a.target='_blank';a.rel='noopener';
+  a.textContent='▶ '+co+'　'+title;
+  const s=document.createElement('small');s.textContent=[lang,t?'從 '+mmss(t)+' 開始':''].filter(Boolean).join('・');
+  a.append(s);return a;
+}
+const pk=document.getElementById('picks');
+if(PICKS.length)PICKS.forEach(p=>pk.append(pick(p)));
+else{const n=document.createElement('p');n.className='note';n.textContent='還沒有精選。在 YouTube 看到想聽的法說會，把連結（和 Q&A 大概幾分開始）貼給 Claude 就會加到這裡。';pk.append(n)}
 const dir=document.getElementById('dir');
 for(const [t,cs] of DATA){
   const h=document.createElement('h2');h.textContent=t;dir.append(h);
-  for(const [n,d,u,v,vt] of cs){
+  for(const [n,d,u] of cs){
     const e=document.createElement('div');e.className='co';
     const b=document.createElement('b');b.textContent=n;
     const s=document.createElement('small');s.textContent=d;
     const l=document.createElement('div');l.className='links';
-    const a=document.createElement('a');a.className='b';a.href=u;a.target='_blank';a.rel='noopener';a.textContent='法說會 / IR 頁面';
+    PICKS.filter(p=>p[0]===n).forEach(p=>e.append(pick(p)));
+    const a=document.createElement('a');a.className='b';a.href=u;a.target='_blank';a.rel='noopener';a.textContent='IR 頁面';
     const y=document.createElement('a');y.className='b';y.target='_blank';y.rel='noopener';
     y.href='https://www.youtube.com/results?search_query='+encodeURIComponent(n+' earnings call');y.textContent='YouTube 搜尋';
-    if(v){const w=document.createElement('button');w.className='p';w.textContent='▶ 在這裡播放：'+vt;w.onclick=()=>playYT(ytId(v),n+' '+vt);l.append(w);}
-    l.append(a,y);e.append(b,s,l);dir.append(e);
+    l.append(a,y);e.prepend(b,s);e.append(l);dir.append(e);
   }
 }
-
-function ytId(u){const m=u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);return m&&m[1]}
-function playYT(id,title){
-  const au=document.getElementById('au');au.pause();
-  document.getElementById('ytwrap').hidden=false;
-  document.getElementById('ytt').textContent=title;
-  document.getElementById('yt').src='https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1&playsinline=1&rel=0';
-  document.getElementById('ytwrap').scrollIntoView({behavior:'smooth'});
-}
-const au=document.getElementById('au'),now=document.getElementById('now'),list=document.getElementById('list');
-let q=[];let cur=-1;
-try{q=JSON.parse(localStorage.getItem('q')||'[]')}catch(e){}
-const save=()=>{try{localStorage.setItem('q',JSON.stringify(q.filter(x=>!x.local)))}catch(e){}};
-function render(){
-  list.innerHTML='';
-  q.forEach((x,i)=>{
-    const r=document.createElement('div');r.className='q'+(i===cur?' on':'');
-    const s=document.createElement('span');s.textContent=x.name;
-    const p=document.createElement('button');p.textContent='播放';p.onclick=()=>play(i);
-    const d=document.createElement('button');d.textContent='刪除';d.onclick=()=>{q.splice(i,1);if(cur>=i)cur--;save();render()};
-    r.append(s,p,d);list.append(r);
-  });
-  document.getElementById('fnote').hidden=!q.some(x=>x.local);
-}
-function play(i){
-  if(i<0||i>=q.length)return;
-  cur=i;
-  if(q[i].yt){au.pause();document.getElementById('bar').hidden=true;playYT(q[i].yt,q[i].name);now.textContent=q[i].name;render();return}
-  document.getElementById('yt').src='';document.getElementById('ytwrap').hidden=true;
-  document.getElementById('bar').hidden=false;
-  au.src=q[i].url;au.play().catch(()=>{});now.textContent=q[i].name;
-  if('mediaSession' in navigator){
-    navigator.mediaSession.metadata=new MediaMetadata({title:q[i].name,artist:'AI 製程法說會電台'});
-  }
-  render();
-}
-au.addEventListener('play',()=>{document.getElementById('yt').src='';document.getElementById('ytwrap').hidden=true});
-au.addEventListener('ended',()=>play(cur+1));
-if('mediaSession' in navigator){
-  const ms=navigator.mediaSession;
-  ms.setActionHandler('play',()=>au.play());
-  ms.setActionHandler('pause',()=>au.pause());
-  ms.setActionHandler('previoustrack',()=>play(cur-1));
-  ms.setActionHandler('nexttrack',()=>play(cur+1));
-  try{ms.setActionHandler('seekbackward',()=>{au.currentTime=Math.max(0,au.currentTime-15)});
-  ms.setActionHandler('seekforward',()=>{au.currentTime+=30});}catch(e){}
-}
-document.getElementById('add').onclick=()=>{
-  const u=document.getElementById('url').value.trim();
-  if(!/^https?:\/\//.test(u))return alert('請貼上 https:// 開頭的網址');
-  const nm=document.getElementById('name').value.trim()||u,id=ytId(u);
-  q.push(id?{name:nm,url:u,yt:id}:{name:nm,url:u});
-  document.getElementById('name').value='';document.getElementById('url').value='';
-  save();render();
-};
-document.getElementById('file').onchange=e=>{
-  for(const f of e.target.files)q.push({name:f.name,url:URL.createObjectURL(f),local:true});
-  render();
-};
-render();
 </script>
 </body>
 </html>
