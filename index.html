@@ -9,7 +9,7 @@
 :root{--bg:#f8fafc;--fg:#0f172a;--mut:#64748b;--card:#fff;--line:#e2e8f0;--acc:#2563eb}
 @media(prefers-color-scheme:dark){:root{--bg:#0f172a;--fg:#e2e8f0;--mut:#94a3b8;--card:#1e293b;--line:#334155;--acc:#60a5fa}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:0 16px 140px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:0 16px 160px}
 main{max-width:760px;margin:0 auto}
 h1{font-size:1.4rem;margin:20px 0 4px}
 .sub{color:var(--mut);font-size:.9rem;margin:0 0 16px}
@@ -53,7 +53,7 @@ audio{width:100%}
 <p class="note">連結為各公司官方 IR 入口，進去後找 Earnings / 決算説明 / 法說會。部分連結尚未逐一驗證，若失效請告訴我。</p>
 </main>
 
-<div id="bar"><div class="in">
+<div id="bar" hidden><div class="in">
 <div id="now">尚未播放</div>
 <audio id="au" controls preload="none"></audio>
 </div></div>
@@ -61,14 +61,14 @@ audio{width:100%}
 <script>
 const DATA=[
 ["設計 / EDA / IP",[
-["NVIDIA","GPU、AI 加速器","https://investor.nvidia.com/events-and-presentations/events-and-presentations/default.aspx","https://www.youtube.com/watch?v=w1Xl8_U5I30","FY2027 Q2 法說會（英文）"],
+["NVIDIA","GPU、AI 加速器","https://investor.nvidia.com/events-and-presentations/events-and-presentations/default.aspx"],
 ["AMD","CPU / GPU","https://ir.amd.com/"],
 ["Broadcom","客製 AI 晶片、網通","https://investors.broadcom.com/"],
 ["Arm","IP 授權","https://investors.arm.com/"],
 ["Synopsys","EDA / IP","https://investor.synopsys.com/"],
 ["Cadence","EDA / IP","https://investor.cadence.com/"]]],
 ["晶圓代工 / IDM",[
-["台積電 TSMC","先進製程代工","https://investor.tsmc.com/chinese","https://www.youtube.com/watch?v=WRKY-HMkyU8","3Q25 法說會（英文）"],
+["台積電 TSMC","先進製程代工","https://investor.tsmc.com/chinese"],
 ["Intel","IDM + 代工","https://www.intc.com/"],
 ["Samsung Electronics","代工 + 記憶體","https://www.samsung.com/global/ir/"]]],
 ["製造設備",[
@@ -80,7 +80,7 @@ const DATA=[
 ["Lasertec","EUV 光罩檢測","https://www.lasertec.co.jp/en/ir/"],
 ["DISCO","切割、研磨","https://www.disco.co.jp/eg/ir/"]]],
 ["檢測 / 測試",[
-["愛德萬 Advantest","SoC 測試機","https://www.advantest.com/investors","https://www.youtube.com/watch?v=ru7RQrzT4ok","Q1 2026 法說會（英文，第三方上傳）"],
+["愛德萬 Advantest","SoC 測試機","https://www.advantest.com/investors"],
 ["Teradyne","測試設備","https://investors.teradyne.com/"]]],
 ["材料 / 耗材",[
 ["信越化學 Shin-Etsu","矽晶圓、光阻","https://www.shinetsu.co.jp/en/ir/"],
@@ -136,8 +136,9 @@ function render(){
 function play(i){
   if(i<0||i>=q.length)return;
   cur=i;
-  if(q[i].yt){au.pause();playYT(q[i].yt,q[i].name);now.textContent=q[i].name;render();return}
+  if(q[i].yt){au.pause();document.getElementById('bar').hidden=true;playYT(q[i].yt,q[i].name);now.textContent=q[i].name;render();return}
   document.getElementById('yt').src='';document.getElementById('ytwrap').hidden=true;
+  document.getElementById('bar').hidden=false;
   au.src=q[i].url;au.play().catch(()=>{});now.textContent=q[i].name;
   if('mediaSession' in navigator){
     navigator.mediaSession.metadata=new MediaMetadata({title:q[i].name,artist:'AI 製程法說會電台'});
