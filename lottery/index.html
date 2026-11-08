@@ -63,14 +63,18 @@ textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
 .stylebtn[aria-pressed="true"]{border-color:var(--buoy);background:#fff1ef}
 .tour{position:fixed;inset:0;z-index:70}
 .tour-hole{position:fixed;border-radius:20px;box-shadow:0 0 0 200vmax rgba(3,12,24,.8);outline:4px solid var(--kelp);outline-offset:2px;pointer-events:none;transition:top .25s,left .25s,width .25s,height .25s}
-.tour-tip{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));max-width:560px;margin:0 auto;background:#fff;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.4)}
-.tour-tip.bottom{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-.tour-tip.top{top:calc(12px + env(safe-area-inset-top,0px))}
-.tour-step{font-size:13px;font-weight:900;color:var(--buoy);letter-spacing:.06em}
-.tour-title{font-size:26px;font-weight:900;line-height:1.2}
-.tour-text{font-size:19px;line-height:1.6;font-weight:700}
-.tour-btns{display:flex;gap:8px;flex-wrap:wrap}
-.tour-btns .btn{flex:1;min-width:90px}
+.tour-tip{position:fixed;display:block;box-sizing:border-box;width:auto;max-width:520px;background:#fff;border-radius:18px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.45);transition:top .25s}
+.tour-tip>*+*{margin-top:8px}
+.tour-tip:after{content:"";position:absolute;left:var(--ax,50%);width:16px;height:16px;background:#fff;transform:translateX(-50%) rotate(45deg)}
+.tour-tip.below:after{top:-8px}
+.tour-tip.above:after{bottom:-8px}
+.tour-tip.over:after{display:none}
+.tour-step{display:block;font-size:13px;font-weight:900;color:var(--buoy);letter-spacing:.06em}
+.tour-title{display:block;font-size:22px;font-weight:900;line-height:1.25}
+.tour-text{display:block;font-size:17px;line-height:1.6;font-weight:700}
+.tour-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tour-btns .btn{padding:10px 6px;font-size:15px;width:100%}
+.tour-tip .note{font-size:12px}
 .howto{background:#f2f8fd;border-radius:12px;padding:10px 12px}
 .howto summary{font-weight:900;color:var(--deep);cursor:pointer}
 .howto ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;line-height:1.55;font-size:15px}
@@ -437,10 +441,14 @@ let tourI=0;
 function tourEl(i){return document.querySelector('[data-tour="'+TOUR[i][0]+'"]')}
 function tourPlace(){const el=tourEl(tourI);if(!el)return;const r=el.getBoundingClientRect(),h=$('#tourHole'),pad=6;
   h.style.left=(r.left-pad)+'px';h.style.top=(r.top-pad)+'px';h.style.width=(r.width+pad*2)+'px';h.style.height=(r.height+pad*2)+'px';
-  const tip=$('#tourTip');const mid=r.top+r.height/2;tip.className='tour-tip '+(mid<innerHeight*.5?'bottom':'top')}
+  const tip=$('#tourTip');const vw=document.documentElement.clientWidth,vh=innerHeight,m=12;const w=Math.min(520,vw-m*2);tip.style.width=w+'px';
+  const left=Math.max(m,Math.min(vw-w-m,r.left+r.width/2-w/2));tip.style.left=left+'px';tip.style.setProperty('--ax',Math.max(24,Math.min(w-24,r.left+r.width/2-left))+'px');
+  const th=tip.offsetHeight;let cls,top;
+  if(r.bottom+pad+14+th<=vh-m){cls='below';top=r.bottom+pad+14}else if(r.top-pad-14-th>=m){cls='above';top=r.top-pad-14-th}else{cls='over';top=vh-th-m}
+  tip.className='tour-tip '+cls;tip.style.top=top+'px'}
 function tourGo(i){tourI=(i+TOUR.length)%TOUR.length;const [k,t,x]=TOUR[tourI];$('#tourStep').textContent=(tourI+1)+' / '+TOUR.length;$('#tourTitle').textContent=t;$('#tourText').textContent=x;
-  const el=tourEl(tourI);if(el){const r=el.getBoundingClientRect();const tipH=$('#tourTip').offsetHeight||260;
-    const want=r.height+tipH+40>innerHeight?r.top-20:r.top-(innerHeight-tipH-r.height)/2;window.scrollBy(0,want)}
+  const el=tourEl(tourI);if(el){const r=el.getBoundingClientRect();const tipH=$('#tourTip').offsetHeight||240;
+    const fits=r.height+tipH+50<=innerHeight;const want=fits?r.top-(innerHeight-tipH-r.height-30)/2:r.top-20;window.scrollBy(0,want)}
   $('#tourNext').textContent=tourI===TOUR.length-1?'完成':'下一個';requestAnimationFrame(tourPlace)}
 function tourOpen(){show('setup');$('#tour').hidden=false;tourGo(0);LS.set('fl.toured',1)}
 function tourShut(){$('#tour').hidden=true}
