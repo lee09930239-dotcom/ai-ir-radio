@@ -1,0 +1,811 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0b2440"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style></head><body>
+<title>直播抽獎台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Noto+Sans+TC:wght@500;700;900&display=swap">
+<style>
+/* Layout: one phone-portrait screen at a time; the draw screen gives the sea stage most of the height. Single committed look (sea + buoy), not theme-switched. */
+:root{
+  --navy:#0b2440; --deep:#103a63; --sea:#1680c4; --foam:#e9f7ff;
+  --buoy:#ff4b3e; --kelp:#ffc93c; --ink:#0b2440; --muted:#5a7390; --panel:#ffffff; --line:#d5e4f1;
+  --ok:#1f9d6b;
+  --display:'Baloo 2','Noto Sans TC',system-ui,sans-serif;
+  --body:'Noto Sans TC',system-ui,-apple-system,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--navy);color:var(--ink);font-family:var(--body);font-size:16px;overflow-x:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--kelp);outline-offset:2px}
+.screen{min-height:100%;display:flex;flex-direction:column}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;max-width:720px;margin:0 auto;width:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+
+/* brand bar */
+.brand{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--foam)}
+.brand h1{font-family:var(--display);font-weight:800;font-size:28px;margin:0;letter-spacing:.02em;text-wrap:balance}
+.brand h1 span{color:var(--kelp)}
+.nav{display:flex;gap:6px}
+.nav button{background:transparent;border:1.5px solid #3d6a94;color:var(--foam);border-radius:999px;padding:6px 12px;font-size:14px}
+.nav button[aria-current="true"]{background:var(--foam);color:var(--navy);border-color:var(--foam)}
+
+.card{background:var(--panel);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{margin:0;font-size:18px;font-weight:900;display:flex;align-items:baseline;gap:8px}
+.card h2 small{font-weight:500;color:var(--muted);font-size:13px}
+.lbl{font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+input[type=text],input[type=number],textarea,select{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#f7fbff;width:100%;box-sizing:border-box}
+textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prize-row{display:grid;grid-template-columns:1fr 84px 40px;gap:8px;align-items:center}
+.prize-row input[type=number]{text-align:center;font-variant-numeric:tabular-nums}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font-size:20px;line-height:1;color:var(--muted)}
+.btn{border:0;border-radius:14px;padding:12px 16px;font-weight:900;background:var(--deep);color:#fff}
+.btn.ghost{background:#eef5fb;color:var(--deep)}
+.btn.red{background:var(--buoy)}
+.btn.big{font-size:22px;padding:16px;border-radius:18px;width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow:auto}
+.chip{display:inline-flex;align-items:center;gap:4px;background:#eaf4fc;border-radius:999px;padding:4px 6px 4px 10px;font-size:14px;max-width:100%}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{border:0;background:transparent;color:var(--muted);font-size:16px;padding:0 4px}
+.count{font-family:var(--display);font-weight:800;font-size:20px;color:var(--deep);font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+.toggle{display:flex;align-items:center;gap:10px;font-weight:700}
+.toggle input{width:22px;height:22px;accent-color:var(--buoy)}
+.bgprev{width:100%;aspect-ratio:16/9;max-width:100%;border-radius:12px;background:linear-gradient(#7fd3ff,#d8f3ff 55%,#1680c4 55%,#0d4f86);background-size:cover;background-position:center;border:1.5px solid var(--line)}
+.tourbtn{background:var(--kelp);color:var(--navy);border:0;border-radius:999px;padding:8px 14px;font-weight:900;font-size:15px}
+.stylepick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stylebtn{display:flex;flex-direction:column;gap:4px;text-align:left;border:2.5px solid var(--line);background:#f7fbff;border-radius:14px;padding:12px;min-width:0}
+.stylebtn b{font-size:18px}
+.stylebtn small{color:var(--muted);font-size:13px;line-height:1.4}
+.stylebtn[aria-pressed="true"]{border-color:var(--buoy);background:#fff1ef}
+.tour{position:fixed;inset:0;z-index:70}
+.tour-hole{position:fixed;border-radius:20px;box-shadow:0 0 0 200vmax rgba(3,12,24,.8);outline:4px solid var(--kelp);outline-offset:2px;pointer-events:none;transition:top .25s,left .25s,width .25s,height .25s}
+.tour-tip{position:fixed;display:block;box-sizing:border-box;width:auto;max-width:520px;background:#fff;border-radius:18px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.45);transition:top .25s}
+.tour-tip>*+*{margin-top:8px}
+.tour-tip:after{content:"";position:absolute;left:var(--ax,50%);width:16px;height:16px;background:#fff;transform:translateX(-50%) rotate(45deg)}
+.tour-tip.below:after{top:-8px}
+.tour-tip.above:after{bottom:-8px}
+.tour-tip.over:after{display:none}
+.tour-step{display:block;font-size:13px;font-weight:900;color:var(--buoy);letter-spacing:.06em}
+.tour-title{display:block;font-size:22px;font-weight:900;line-height:1.25}
+.tour-text{display:block;font-size:17px;line-height:1.6;font-weight:700}
+.tour-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tour-btns .btn{padding:10px 6px;font-size:15px;width:100%}
+.tour-tip .note{font-size:12px}
+.howto{background:#f2f8fd;border-radius:12px;padding:10px 12px}
+.howto summary{font-weight:900;color:var(--deep);cursor:pointer}
+.howto ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;line-height:1.55;font-size:15px}
+.banner{background:var(--kelp);color:var(--navy);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-weight:700}
+
+/* draw screen */
+#draw{height:100%;min-height:0}
+#draw .top{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:10px 8px;display:flex;flex-direction:column;gap:8px;color:var(--foam)}
+#draw .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:700;font-size:15px}
+#draw .meta b{font-family:var(--display);font-size:20px;color:var(--kelp);font-variant-numeric:tabular-nums}
+.selrow{display:grid;grid-template-columns:1fr auto;gap:8px}
+.adjbtn{border:2px solid #3d6a94;background:transparent;color:var(--foam);border-radius:16px;padding:4px 12px;font-weight:900;font-size:14px;line-height:1.2}
+#castBtn.bonusmode{background:var(--kelp);color:var(--navy)}
+.bonus{position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,#ffe27a,#ff9f1c 55%,#d9480f);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;text-align:center;z-index:5}
+.bonus-img{width:min(70%,52vh);aspect-ratio:1/1;max-width:100%;border-radius:50%;border:8px solid #fff;background:#fff3c4 center/cover no-repeat;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.bonus-img.none{display:none}
+.bonus-word{font-family:var(--body);font-weight:900;font-size:clamp(48px,17vw,110px);line-height:1;color:#fff;-webkit-text-stroke:10px var(--navy);paint-order:stroke fill;text-shadow:0 8px 0 var(--navy);letter-spacing:.04em}
+.bonus.pop .bonus-img{animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
+.bonus.pop .bonus-word{animation:pop .6s .25s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(.2) rotate(-12deg);opacity:0}to{transform:none;opacity:1}}
+.bonus-form{background:rgba(255,255,255,.95);border-radius:16px;padding:12px;display:flex;gap:8px;flex-wrap:wrap;width:100%;max-width:420px;box-sizing:border-box;text-align:left}
+.poster{position:fixed;inset:0;z-index:40;background:linear-gradient(170deg,#0b2440,#1680c4);color:#fff;overflow:auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px}
+.poster h3{margin:0;font-family:var(--display);font-weight:800;font-size:44px;color:var(--kelp);line-height:1}
+.poster .pt{font-size:26px;font-weight:900;text-wrap:balance}
+.poster .pm{color:#a9c3dc;font-size:16px}
+.pgroup{background:rgba(255,255,255,.12);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.pgroup .pp{color:var(--kelp);font-weight:900;font-size:18px}
+.pgroup .pn{font-family:var(--display);font-weight:800;font-size:28px;line-height:1.15;word-break:break-all}
+.poster .hint{text-align:center;color:#a9c3dc;font-size:13px;margin-top:auto}
+#prizeSel{font-size:22px;font-weight:900;padding:12px 14px;border-radius:16px;background:var(--foam);color:var(--navy);border:3px solid var(--kelp);appearance:auto}
+.stage{position:relative;flex:1;min-height:0;margin:0 max(8px,env(safe-area-inset-left,0px));border-radius:22px;overflow:hidden;background:#0d4f86}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.reveal{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(255,255,255,.96);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.reveal .pz{font-weight:900;color:var(--buoy);font-size:18px}
+.who{display:flex;align-items:center;gap:12px;justify-content:center;min-width:0}
+.av{flex:none;width:64px;height:64px;border-radius:50%;background:#dfe9f3 center/cover no-repeat;border:3px solid var(--kelp);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:28px;color:#fff;cursor:pointer;padding:0}
+.av.sm{width:34px;height:34px;font-size:15px;border-width:2px;cursor:default}
+.av.md{width:52px;height:52px;font-size:22px;cursor:default}
+.cm{font-size:16px;color:var(--muted);font-weight:700;line-height:1.45;word-break:break-word}
+.cm:not(:empty)::before{content:"「"}.cm:not(:empty)::after{content:"」"}
+.pgroup .prow{display:flex;align-items:center;gap:12px;min-width:0}
+.pgroup .pcm{font-size:14px;color:#cfe0f0;font-weight:700}
+td.n .ncell{display:flex;align-items:center;gap:8px}
+td.n small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.reveal .nm{font-family:var(--display);font-weight:800;font-size:clamp(28px,9vw,52px);line-height:1.05;word-break:break-all;color:var(--navy)}
+.reveal .row{justify-content:center}
+.reveal .row .btn{flex:1;min-width:120px}
+.bottom{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:10px 12px;display:grid;grid-template-columns:1fr auto;gap:8px}
+#castBtn{font-size:28px;letter-spacing:.1em}
+.small-actions{display:flex;gap:8px}
+.endbtn{background:#2b4f74;color:#fff;border:0;border-radius:18px;padding:0 16px;font-weight:900;font-size:16px}
+
+/* results */
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);letter-spacing:.05em}
+td.t{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+td.n{font-weight:900;word-break:break-all}
+tr.redrawn td{color:#9aaabb;text-decoration:line-through}
+tr.redrawn td.s{text-decoration:none}
+.tag{display:inline-block;white-space:nowrap;font-size:12px;border-radius:6px;padding:2px 6px;background:#eef5fb;color:var(--muted);font-weight:700}
+.tag.win{background:#e3f6ee;color:var(--ok)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hist-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--line);border-radius:14px;background:#f7fbff;text-align:left;width:100%}
+.hist-item b{display:block;font-size:16px}
+.hist-item small{color:var(--muted)}
+.confirm{background:#fff4f2;border:1.5px solid #ffc9c3;border-radius:12px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:700}
+
+/* sheet for export fallback */
+.sheet{position:fixed;inset:0;background:rgba(5,20,38,.8);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.sheet .card{max-width:560px;width:100%;max-height:90%;overflow:auto}
+.sheet img{width:100%;border-radius:12px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;border:2px solid var(--kelp);padding:10px 16px;border-radius:999px;font-weight:700;z-index:60;max-width:90%;text-align:center}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<!-- ============ SETUP ============ -->
+<section id="setup" class="screen">
+  <div class="wrap">
+    <div class="brand">
+      <button class="tourbtn" id="tourBtn">？ 功能導覽</button>
+      <nav class="nav" data-tour="nav"><button aria-current="true" data-go="setup">設定</button><button data-go="history">紀錄</button></nav>
+    </div>
+    <div class="brand"><h1>直播<span>抽獎台</span></h1></div>
+
+    <div id="resumeBanner" class="banner" hidden>
+      <span id="resumeText">上一場還沒結束</span>
+      <span class="row"><button class="btn" id="resumeBtn">繼續抽</button><button class="btn ghost" id="resumeResults">看結果</button></span>
+    </div>
+
+    <div class="card" data-tour="event">
+      <h2>今天的場次</h2>
+      <div class="field"><label class="lbl" for="evTitle">場次名稱</label><input id="evTitle" type="text" maxlength="40"></div>
+      <p class="note" id="evDate"></p>
+    </div>
+
+    <div class="card" data-tour="prize">
+      <h2>獎品 <small>名稱與數量</small></h2>
+      <div id="prizeList" style="display:flex;flex-direction:column;gap:8px"></div>
+      <button class="btn ghost" id="addPrize">＋ 新增獎品</button>
+    </div>
+
+    <div class="card" data-tour="people">
+      <h2>參加者 <small>符合資格的留言帳號</small></h2>
+      <details class="howto"><summary>教學：怎麼把 IG 直播留言放進來</summary>
+        <ol>
+          <li>開播時先公告：「留言 <b>+1</b> 參加抽獎」（關鍵字可以自己改）。</li>
+          <li>截止時，用另一支手機或請小幫手把留言區截圖。往上滑多截幾張，重疊沒關係。</li>
+          <li>回到這裡按「從留言截圖匯入」，一次選多張。系統會讀出含關鍵字的留言帳號，重複的只算一次。</li>
+          <li>檢查下面的名單，不符資格的（例如分身帳號）按 × 排除。</li>
+          <li>也可以直接貼上留言文字，或在下面手動輸入帳號。</li>
+        </ol>
+      </details>
+      <div class="field">
+        <a class="btn" href="https://app-sorteos.com/en" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">用 App Sorteos 抓貼文留言名單 ↗</a>
+        <p class="note">打開後用 IG 登入、選貼文、設關鍵字，它會列出參加者。把名單複製回來，貼到下面的「貼上留言」，就能用這裡的畫面抽獎。</p>
+      </div>
+      <div class="field"><label class="lbl" for="kw">留言關鍵字（留空 = 每行都算）</label><input id="kw" type="text" maxlength="20" placeholder="例如 +1"></div>
+      <div class="field" id="ocrBox">
+        <label class="btn" for="ocrFile" style="text-align:center">從留言截圖匯入</label>
+        <input id="ocrFile" type="file" accept="image/*" multiple hidden>
+        <p class="note" id="ocrStatus">可以一次選多張。讀取要等一下，讀完請檢查名單。</p>
+      </div>
+      <div class="field">
+        <label class="lbl" for="paste">貼上留言（一行一則，開頭是帳號）</label>
+        <textarea id="paste" spellcheck="false"></textarea>
+        <p class="note">格式像「fishing_tom +1」或「@ami_0921：+1 我要」都可以。同一個帳號只算一次，大小寫和 @ 會自動統一。</p>
+      </div>
+      <div class="row">
+        <input id="manualName" type="text" placeholder="手動加一個帳號" style="flex:1;min-width:160px">
+        <button class="btn ghost" id="addManual">加入</button>
+      </div>
+      <div class="row" style="justify-content:space-between"><span>符合資格：<span class="count" id="pCount">0</span> 人</span><button class="btn ghost" id="clearPaste">清空</button></div>
+      <div class="chips" id="pChips"></div>
+    </div>
+
+    <div class="card" data-tour="style">
+      <h2>抽獎畫面</h2>
+      <div class="stylepick">
+        <button class="stylebtn" data-style="fish" aria-pressed="true"><b>海釣</b><small>甩竿入海，釣起來的魚就是得獎者</small></button>
+        <button class="stylebtn" data-style="garapon" aria-pressed="false"><b>商店街抽獎桶</b><small>轉動抽獎桶，掉出來的珠珠就是得獎者</small></button>
+      </div>
+    </div>
+
+    <div class="card" data-tour="rules">
+      <h2>規則</h2>
+      <label class="toggle"><input type="checkbox" id="sound">音效</label>
+      <p class="note">同一場中過獎（或被重抽）的人一律不會再被抽到。獎品抽完後會出現「主委加碼」，只有按「結束抽獎」才會結束這一場。</p>
+    </div>
+
+    <div class="card" data-tour="bonus">
+      <h2>主委加碼圖片 <small>按下加碼時跳出</small></h2>
+      <div class="bgprev" id="bonusPrev" style="aspect-ratio:1/1;max-width:220px;background:var(--kelp) center/cover no-repeat"></div>
+      <div class="row">
+        <label class="btn ghost" for="bonusFile" style="display:inline-block">上傳照片</label>
+        <input id="bonusFile" type="file" accept="image/*" hidden>
+        <button class="btn ghost" id="bonusReset">移除照片</button>
+      </div>
+    </div>
+
+    <div class="card" data-tour="bg">
+      <h2>背景圖片</h2>
+      <div class="bgprev" id="bgPrev"></div>
+      <div class="row">
+        <label class="btn ghost" for="bgFile" style="display:inline-block">上傳圖片</label>
+        <input id="bgFile" type="file" accept="image/*" hidden>
+        <button class="btn ghost" id="bgReset">用預設海景</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="showSea">在背景上加海浪</label>
+    </div>
+
+    <button class="btn red big" id="startBtn" data-tour="start">開始抽獎</button>
+    <p class="note" id="startHint" style="text-align:center;color:#a9c3dc"></p>
+  </div>
+</section>
+
+<!-- ============ DRAW ============ -->
+<section id="draw" class="screen" hidden>
+  <div class="top">
+    <div class="meta"><span id="dTitle"></span><span>參加 <b id="dTotal">0</b> 人・可抽 <b id="dPool">0</b> 人</span></div>
+    <label class="lbl" for="prizeSel" style="color:#a9c3dc">要抽哪個獎品</label>
+    <div class="selrow"><select id="prizeSel"></select><button class="adjbtn" id="adjBtn">調整<br>獎品</button></div>
+  </div>
+  <div class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div class="reveal" id="reveal" hidden>
+      <div class="pz" id="rvPrize"></div>
+      <div class="who"><button class="av" id="rvAv" aria-label="設定得獎者大頭照"></button><div class="nm" id="rvName"></div></div>
+      <div class="cm" id="rvCm"></div>
+      <input id="avFile" type="file" accept="image/*" hidden>
+      <div class="row"><button class="btn red" id="nextBtn">下一抽</button><button class="btn ghost" id="redrawBtn">重抽（沒回應／不符資格）</button></div>
+    </div>
+    <div class="bonus" id="bonus" hidden>
+      <div class="bonus-img" id="bonusImg"></div>
+      <div class="bonus-word">主委加碼</div>
+      <form class="bonus-form" id="bonusForm" hidden>
+        <div class="field" style="flex:1;min-width:140px"><label class="lbl" for="bnName">加碼獎品</label><input id="bnName" type="text" maxlength="30" placeholder="例如 主委紅包"></div>
+        <div class="field" style="width:84px"><label class="lbl" for="bnQty">數量</label><input id="bnQty" type="number" min="1" max="999" value="1"></div>
+        <button class="btn red" type="submit" style="align-self:flex-end">繼續抽</button>
+      </form>
+    </div>
+  </div>
+  <div class="bottom">
+    <button class="btn red big" id="castBtn">甩竿！</button>
+    <button class="endbtn" id="endBtn">結束抽獎</button>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section id="results" class="screen" hidden>
+  <div class="wrap">
+    <div class="brand"><h1>今日<span>漁獲</span></h1><nav class="nav"><button data-go="setup">設定</button><button data-go="history">紀錄</button></nav></div>
+    <div class="card">
+      <h2 id="rsTitle"></h2>
+      <p class="note" id="rsMeta"></p>
+      <div class="tablewrap"><table><thead><tr><th>獎品</th><th>得獎者</th><th>時間</th><th>狀態</th></tr></thead><tbody id="rsBody"></tbody></table></div>
+    </div>
+    <div class="grid2">
+      <button class="btn" id="saveBtn">儲存紀錄</button>
+      <button class="btn ghost" id="backDraw">回去繼續抽</button>
+      <button class="btn ghost" id="posterBtn">公布頁（給觀眾截圖）</button>
+      <button class="btn ghost" id="pngBtn">下載圖片</button>
+    </div>
+    <button class="btn red big" id="againBtn">再開一場</button>
+  </div>
+</section>
+
+<!-- ============ HISTORY ============ -->
+<section id="history" class="screen" hidden>
+  <div class="wrap">
+    <div class="brand"><h1>過去<span>紀錄</span></h1><nav class="nav"><button data-go="setup">設定</button><button aria-current="true" data-go="history">紀錄</button></nav></div>
+    <div class="card">
+      <h2>依日期 <small id="histSrc"></small></h2>
+      <div id="histList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+</section>
+
+<div id="sheet" class="sheet" hidden><div class="card"><h2 id="shTitle"></h2><div id="shBody"></div><button class="btn" id="shClose">關閉</button></div></div>
+<div id="poster" class="poster" hidden role="dialog" aria-label="得獎公布"></div>
+<div id="tour" class="tour" hidden>
+  <div class="tour-hole" id="tourHole"></div>
+  <div class="tour-tip" id="tourTip">
+    <div class="tour-step" id="tourStep"></div>
+    <div class="tour-title" id="tourTitle"></div>
+    <div class="tour-text" id="tourText"></div>
+    <div class="tour-btns"><button class="btn ghost" id="tourPrev">上一個</button><button class="btn red" id="tourNext">下一個</button><button class="btn ghost" id="tourClose">關閉導覽</button></div>
+    <p class="note">也可以直接點畫面上任何一區看說明</p>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}},
+  raw(k){try{return localStorage.getItem(k)}catch(e){return null}},
+  setRaw(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}},
+  del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const hms=iso=>{const d=new Date(iso);return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())};
+const norm=n=>String(n||'').trim().replace(/^@+/,'').toLowerCase();
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const SAMPLE='fishing_tom +1\n@ami_0921：+1 我要！\nlure.master 好想要 +1\nkenji_bass +1\n阿凱釣魚日記 +1\nFishing_Tom +1 再留一次\nsea_bream_lover 這尾好大\nmomo.fish +1\n釣魚小白 +1\nriver_otter_88 +1';
+const DEF={title:'直播抽獎',keyword:'+1',paste:SAMPLE,manual:[],removed:[],excludePast:false,sound:true,showSea:true,
+  prizes:[{id:'p1',name:'釣具福袋',qty:1},{id:'p2',name:'路亞假餌組',qty:3},{id:'p3',name:'頻道貼紙',qty:5}]};
+let S=Object.assign({},DEF,LS.get('fl.settings',{}));S.excludePast=false;
+let session=LS.get('fl.session',null);
+let hist=LS.get('fl.history',[]);
+let db=null, dl=null, sm=null, bgImg=null;
+
+/* ---------- capabilities ---------- */
+(async()=>{
+  if(!(window.claude&&claude.use))return;
+  try{dl=await claude.use('downloads')}catch(e){}
+  try{db=await claude.use('db')}catch(e){}
+  try{sm=await claude.use('sample');if(sm){const lim=await sm.limits().catch(()=>null);if(lim&&lim.images){sm._max=lim.images.maxCount||lim.images.maxImages||5}else sm=null}}catch(e){}
+  if(db){
+    try{
+      const snap=await db.collection('sessions').orderBy('startedAt','desc').limit(300).get();
+      const m=new Map(hist.map(h=>[h.id,h]));
+      snap.docs.forEach(d=>{const v=d.data();if(v&&v.id)m.set(v.id,v)});
+      hist=[...m.values()].sort((a,b)=>b.startedAt.localeCompare(a.startedAt));
+      LS.set('fl.history',hist);
+      if(!$('#history').hidden)renderHistory();
+      refreshSetup();
+    }catch(e){}
+  }
+})();
+
+function persist(){
+  LS.set('fl.session',session);
+  if(session&&session.results.length){
+    const i=hist.findIndex(h=>h.id===session.id);
+    const copy=JSON.parse(JSON.stringify(session));
+    if(i>=0)hist[i]=copy;else hist.unshift(copy);
+    LS.set('fl.history',hist);
+    if(db)db.collection('sessions').doc(session.id).set(copy).catch(()=>{});
+  }
+}
+function saveSettings(){LS.set('fl.settings',S)}
+
+/* ---------- toast & sheet ---------- */
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
+function sheet(title,node){$('#shTitle').textContent=title;const b=$('#shBody');b.innerHTML='';b.appendChild(node);$('#sheet').hidden=false}
+$('#shClose').onclick=()=>$('#sheet').hidden=true;
+
+/* ---------- navigation ---------- */
+function show(id){['setup','draw','results','history'].forEach(s=>$('#'+s).hidden=s!==id);
+  if(id==='draw'){resizeCanvas();try{navigator.wakeLock&&navigator.wakeLock.request('screen').catch(()=>{})}catch(e){}}
+  if(id==='history')renderHistory();if(id==='setup')refreshSetup();window.scrollTo(0,0)}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
+
+/* ---------- participants ---------- */
+let CMT={};let AVS=LS.get('fl.avatars',{});
+function saveAvs(){if(!LS.set('fl.avatars',AVS)){const ks=Object.keys(AVS);ks.slice(0,Math.ceil(ks.length/2)).forEach(k=>delete AVS[k]);LS.set('fl.avatars',AVS)}}
+function avColor(n){let h=0;for(const ch of norm(n))h=(h*31+ch.charCodeAt(0))>>>0;return ['#ff7a45','#2a9df4','#43aa8b','#9b5de5','#e63946','#f4a261'][h%6]}
+function paintAv(el,name,url){el.style.backgroundImage=url?'url("'+url+'")':'';el.style.backgroundColor=url?'':avColor(name);el.textContent=url?'':(String(name).replace(/^[@._]+/,'')[0]||'?').toUpperCase()}
+function parse(){
+  const kw=S.keyword.trim().toLowerCase();const seen=new Map();const removed=new Set(S.removed);
+  const add=n=>{const k=norm(n);if(!k||removed.has(k)||seen.has(k))return;seen.set(k,n.trim().replace(/^@+/,''))};
+  CMT={};
+  S.paste.split(/\r?\n/).forEach(line=>{line=line.trim();if(!line)return;if(kw&&!line.toLowerCase().includes(kw))return;
+    const m=line.match(/^@?([^\s:：,，]+)[\s:：,，]*(.*)$/);if(m){const k=norm(m[1]);if(m[2]&&!CMT[k])CMT[k]=m[2].slice(0,120);add(m[1])}});
+  S.manual.forEach(add);
+  return [...seen.values()];
+}
+function renderPrizes(){
+  const box=$('#prizeList');box.innerHTML='';
+  S.prizes.forEach((p,i)=>{const r=document.createElement('div');r.className='prize-row';
+    r.innerHTML='<input type="text" aria-label="獎品名稱" maxlength="30"><input type="number" min="1" max="999" aria-label="數量"><button class="iconbtn" aria-label="刪除">×</button>';
+    const [n,q,x]=r.children;n.id='pz-n-'+p.id;q.id='pz-q-'+p.id;n.value=p.name;q.value=p.qty;
+    n.oninput=()=>{p.name=n.value;saveSettings()};q.oninput=()=>{p.qty=Math.max(1,parseInt(q.value)||1);saveSettings()};
+    x.onclick=()=>{S.prizes.splice(i,1);saveSettings();renderPrizes()};box.appendChild(r)});
+}
+function refreshSetup(){
+  $('#evTitle').value=S.title;$('#evDate').textContent='日期：'+today()+'（自動帶入）';
+  $('#kw').value=S.keyword;if(document.activeElement!==$('#paste'))$('#paste').value=S.paste;
+  $('#sound').checked=S.sound;$('#showSea').checked=S.showSea;
+  renderPrizes();renderChips();
+  const live=session&&!session.ended&&session.results.length;
+  $('#resumeBanner').hidden=!live;
+  if(live)$('#resumeText').textContent='「'+session.title+'」還沒結束，已抽 '+session.results.filter(r=>r.status==='won').length+' 位';
+}
+function renderChips(){
+  const list=parse();$('#pCount').textContent=list.length;const box=$('#pChips');box.innerHTML='';
+  list.forEach(n=>{const c=document.createElement('span');c.className='chip';const s=document.createElement('span');s.textContent=n;
+    const b=document.createElement('button');b.textContent='×';b.setAttribute('aria-label','移除 '+n);
+    b.onclick=()=>{S.removed.push(norm(n));S.manual=S.manual.filter(m=>norm(m)!==norm(n));saveSettings();renderChips()};
+    c.append(s,b);box.appendChild(c)});
+  $('#startHint').textContent=list.length?'':'還沒有符合資格的參加者';
+}
+$('#evTitle').oninput=e=>{S.title=e.target.value;saveSettings()};
+$('#kw').oninput=e=>{S.keyword=e.target.value;saveSettings();renderChips()};
+$('#paste').oninput=e=>{S.paste=e.target.value;S.removed=[];saveSettings();renderChips()};
+$('#clearPaste').onclick=()=>{S.paste='';S.manual=[];S.removed=[];$('#paste').value='';saveSettings();renderChips()};
+$('#addManual').onclick=()=>{const v=$('#manualName').value.trim();if(!v)return;S.manual.push(v);S.removed=S.removed.filter(r=>r!==norm(v));$('#manualName').value='';saveSettings();renderChips()};
+$('#manualName').onkeydown=e=>{if(e.key==='Enter')$('#addManual').click()};
+$('#addPrize').onclick=()=>{S.prizes.push({id:'p'+uid(),name:'',qty:1});saveSettings();renderPrizes();const ins=$('#prizeList').querySelectorAll('input[type=text]');ins[ins.length-1].focus()};
+$('#sound').onchange=e=>{S.sound=e.target.checked;saveSettings()};
+$('#showSea').onchange=e=>{S.showSea=e.target.checked;saveSettings()};
+
+/* ---------- style ---------- */
+if(!S.style)S.style='fish';
+function renderStyle(){document.querySelectorAll('.stylebtn').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.style===S.style)))}
+document.querySelectorAll('.stylebtn').forEach(b=>b.onclick=()=>{S.style=b.dataset.style;saveSettings();renderStyle()});
+
+/* ---------- tour ---------- */
+const TOUR=[
+ ['nav','切換頁面','「設定」是現在這一頁。「紀錄」可以照日期看以前每一場的抽獎結果。'],
+ ['event','今天的場次','填這場直播的名稱。日期會自動帶入，之後在紀錄裡會用日期和名稱找到它。'],
+ ['prize','獎品','輸入獎品名稱和數量，按「＋ 新增獎品」可以加更多。抽獎時還可以按「調整獎品」臨時加減。'],
+ ['people','參加者','把 IG 留言放進來：最快是按「用 App Sorteos 抓貼文留言名單」，把名單複製回來貼上；也可以「從留言截圖匯入」、整段貼上留言，或手動輸入帳號。設定關鍵字（例如 +1）只會留下有打關鍵字的人。名單上按 × 可以排除不符資格的帳號。'],
+ ['style','抽獎畫面','選擇抽獎動畫：「海釣」是甩竿釣出寫著名字的魚，「商店街抽獎桶」是轉動抽獎桶，掉出寫著名字的珠珠。'],
+ ['rules','規則','同一場中過獎或被重抽的人，不會再被抽到。獎品抽完會出現「主委加碼」按鈕，只有按「結束抽獎」才會結束。'],
+ ['bonus','主委加碼圖片','上傳按下「主委加碼」時要跳出來的照片。照片只存在這支手機上。'],
+ ['bg','背景圖片','上傳自己喜歡的背景，抽獎畫面會用它當背景。'],
+ ['start','開始抽獎','準備好就按這裡。抽獎畫面上方選要抽的獎品，按大按鈕開始抽；抽完按「結束抽獎」看今日結果一覽表，可以儲存、開公布頁給觀眾截圖，或再開一場。']];
+let tourI=0;
+function tourEl(i){return document.querySelector('[data-tour="'+TOUR[i][0]+'"]')}
+function tourPlace(){const el=tourEl(tourI);if(!el)return;const r=el.getBoundingClientRect(),h=$('#tourHole'),pad=6;
+  h.style.left=(r.left-pad)+'px';h.style.top=(r.top-pad)+'px';h.style.width=(r.width+pad*2)+'px';h.style.height=(r.height+pad*2)+'px';
+  const tip=$('#tourTip');const vw=document.documentElement.clientWidth,vh=innerHeight,m=12;const w=Math.min(520,vw-m*2);tip.style.width=w+'px';
+  const left=Math.max(m,Math.min(vw-w-m,r.left+r.width/2-w/2));tip.style.left=left+'px';tip.style.setProperty('--ax',Math.max(24,Math.min(w-24,r.left+r.width/2-left))+'px');
+  const th=tip.offsetHeight;let cls,top;
+  if(r.bottom+pad+14+th<=vh-m){cls='below';top=r.bottom+pad+14}else if(r.top-pad-14-th>=m){cls='above';top=r.top-pad-14-th}else{cls='over';top=vh-th-m}
+  tip.className='tour-tip '+cls;tip.style.top=top+'px'}
+function tourGo(i){tourI=(i+TOUR.length)%TOUR.length;const [k,t,x]=TOUR[tourI];$('#tourStep').textContent=(tourI+1)+' / '+TOUR.length;$('#tourTitle').textContent=t;$('#tourText').textContent=x;
+  const el=tourEl(tourI);if(el){const r=el.getBoundingClientRect();const tipH=$('#tourTip').offsetHeight||240;
+    const fits=r.height+tipH+50<=innerHeight;const want=fits?r.top-(innerHeight-tipH-r.height-30)/2:r.top-20;window.scrollBy(0,want)}
+  $('#tourNext').textContent=tourI===TOUR.length-1?'完成':'下一個';requestAnimationFrame(tourPlace)}
+function tourOpen(){show('setup');$('#tour').hidden=false;tourGo(0);LS.set('fl.toured',1)}
+function tourShut(){$('#tour').hidden=true}
+$('#tourBtn').onclick=tourOpen;$('#tourClose').onclick=tourShut;$('#tourPrev').onclick=()=>tourGo(tourI-1);
+$('#tourNext').onclick=()=>{if(tourI===TOUR.length-1)tourShut();else tourGo(tourI+1)};
+$('#tour').addEventListener('click',e=>{if($('#tourTip').contains(e.target))return;for(let i=0;i<TOUR.length;i++){const el=tourEl(i);if(!el)continue;const r=el.getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){tourGo(i);return}}});
+$('#tour').addEventListener('wheel',e=>{window.scrollBy(0,e.deltaY);requestAnimationFrame(tourPlace)},{passive:true});
+let tY=null;$('#tour').addEventListener('touchstart',e=>{tY=e.touches[0].clientY},{passive:true});
+$('#tour').addEventListener('touchmove',e=>{if(tY==null||$('#tourTip').contains(e.target))return;const y=e.touches[0].clientY;window.scrollBy(0,tY-y);tY=y;tourPlace()},{passive:true});
+addEventListener('scroll',()=>{if(!$('#tour').hidden)tourPlace()},{passive:true});addEventListener('resize',()=>{if(!$('#tour').hidden)tourPlace()});
+
+/* ---------- screenshot import ---------- */
+function joinUserLines(lines){const isUser=l=>/^@?[A-Za-z0-9._]{2,30}$/.test(l);const out=[];
+  for(let i=0;i<lines.length;i++){const l=lines[i].trim();if(!l)continue;if(isUser(l)&&lines[i+1]&&!isUser(lines[i+1].trim())){out.push(l+' '+lines[i+1].trim());i++}else out.push(l)}return out}
+async function cropAvatars(file,lines){const bmp=await createImageBitmap(file);let n=0;
+  lines.forEach(l=>{const t=(l.text||'').trim();const m=t.match(/^@?([A-Za-z0-9._]{2,30})(\s|$)/);if(!m||!l.bbox)return;const k=norm(m[1]);if(AVS[k])return;
+    const b=l.bbox,lh=b.y1-b.y0,size=lh*2.6,cx=b.x0-size*.68,cy=(b.y0+b.y1)/2+lh*.55;if(cx-size/2<0||cy-size/2<0||cy+size/2>bmp.height)return;
+    const c=document.createElement('canvas');c.width=c.height=96;c.getContext('2d').drawImage(bmp,cx-size/2,cy-size/2,size,size,0,0,96,96);AVS[k]=c.toDataURL('image/jpeg',.8);n++});
+  if(n)saveAvs()}
+async function tessRead(files,st){
+  if(!window.Tesseract){st.textContent='第一次使用要下載文字辨識工具，請稍等…';await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';sc.onload=res;sc.onerror=()=>rej(new Error('load'));document.head.appendChild(sc)})}
+  const worker=await Tesseract.createWorker('eng');const all=[];
+  for(let i=0;i<files.length;i++){st.textContent='讀取截圖中…（'+(i+1)+'/'+files.length+'）';const {data}=await worker.recognize(files[i]);all.push(...joinUserLines(data.text.split(/\n/)));
+    try{await cropAvatars(files[i],data.lines||[])}catch(e){}}
+  await worker.terminate();return all}
+$('#ocrFile').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;
+  if(!sm){const st=$('#ocrStatus');try{const lines=await tessRead(files,st);if(lines.length){S.paste=(S.paste.trim()?S.paste.trim()+'\n':'')+lines.join('\n');$('#paste').value=S.paste;saveSettings();renderChips()}
+    st.textContent='讀到 '+lines.length+' 行文字，已加進上面的留言框並依關鍵字篩選。辨識可能有錯字，請檢查名單。'}catch(err){st.textContent='這裡無法讀取截圖，請改用貼上或手動輸入。'}return}
+  const st=$('#ocrStatus');const max=Math.max(1,sm._max||5);let added=0,read=0;
+  for(let i=0;i<files.length;i+=max){const batch=files.slice(i,i+max);st.textContent='讀取截圖中…（'+Math.min(i+max,files.length)+'/'+files.length+'）';
+    try{const out=await sm.json('These are screenshots of Instagram Live comments. Each comment shows an account username followed by the comment text. List every comment you can read, top to bottom, across all images. Copy usernames exactly as shown (keep dots, underscores, digits; no @). Skip system lines such as "joined" notices. Answer only with JSON: {"comments":[{"user":"username","text":"comment text"}]}',{images:batch,modelTier:'default'});
+      const list=(out&&out.comments)||[];read+=list.length;
+      const lines=list.filter(c=>c&&c.user).map(c=>String(c.user).replace(/\s+/g,'')+' '+String(c.text||'').replace(/\n/g,' '));
+      if(lines.length){S.paste=(S.paste.trim()?S.paste.trim()+'\n':'')+lines.join('\n');added+=lines.length}
+    }catch(err){if(err&&err.code==='not_granted'){st.textContent='沒有允許讀取截圖，可以改用貼上或手動輸入。';return}st.textContent='有截圖讀不出來（'+(err&&err.code||'錯誤')+'），可以再試一次或手動補上。'}}
+  $('#paste').value=S.paste;saveSettings();renderChips();if(read||added)st.textContent='讀到 '+read+' 則留言，已加進上面的留言框，再依關鍵字篩選。請檢查名單。'};
+
+/* ---------- bonus photo ---------- */
+function loadBonus(){const d=LS.raw('fl.bonus');$('#bonusPrev').style.backgroundImage=d?'url("'+d+'")':'';const bi=$('#bonusImg');bi.style.backgroundImage=d?'url("'+d+'")':'';bi.classList.toggle('none',!d)}
+$('#bonusFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const sc=Math.min(1,900/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*sc);c.height=Math.round(im.height*sc);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  if(!LS.setRaw('fl.bonus',c.toDataURL('image/jpeg',.85))&&!LS.setRaw('fl.bonus',c.toDataURL('image/jpeg',.6))){toast('照片太大存不下');return}loadBonus();toast('加碼照片已設定')};im.src=r.result};r.readAsDataURL(f)};
+$('#bonusReset').onclick=()=>{LS.del('fl.bonus');loadBonus()};
+
+/* ---------- background ---------- */
+function loadBg(){const d=LS.raw('fl.bg');bgImg=null;$('#bgPrev').style.backgroundImage='';
+  if(d){const im=new Image();im.onload=()=>{bgImg=im};im.src=d;$('#bgPrev').style.backgroundImage='url("'+d+'")'}}
+$('#bgFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{const im=new Image();im.onload=()=>{const max=1600,sc=Math.min(1,max/Math.max(im.width,im.height));
+    const c=document.createElement('canvas');c.width=Math.round(im.width*sc);c.height=Math.round(im.height*sc);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    let d=c.toDataURL('image/jpeg',.85);if(!LS.setRaw('fl.bg',d)){d=c.toDataURL('image/jpeg',.6);if(!LS.setRaw('fl.bg',d))toast('圖片太大存不下，這次先用著，重開會恢復預設')}
+    bgImg=null;const i2=new Image();i2.onload=()=>bgImg=i2;i2.src=d;$('#bgPrev').style.backgroundImage='url("'+d+'")';toast('背景已更換')};im.src=r.result};
+  r.readAsDataURL(f);e.target.value=''};
+$('#bgReset').onclick=()=>{LS.del('fl.bg');loadBg();toast('已改回預設海景')};
+
+/* ---------- session ---------- */
+function startNew(){
+  const ps=parse();const prizes=S.prizes.filter(p=>p.name.trim()).map(p=>({id:p.id,name:p.name.trim(),qty:p.qty}));
+  if(!prizes.length){toast('請先設定至少一個獎品');return false}
+  if(!ps.length){toast('還沒有符合資格的參加者');return false}
+  session={id:today()+'-'+uid(),date:today(),title:S.title.trim()||'直播抽獎',startedAt:new Date().toISOString(),
+    comments:Object.fromEntries(ps.map(n=>[norm(n),CMT[norm(n)]||'']).filter(e=>e[1])),keyword:S.keyword,excludePast:S.excludePast,style:S.style||'fish',participants:ps,prizes,results:[],ended:false};
+  persist();return true;
+}
+$('#startBtn').onclick=()=>{if(session&&!session.ended&&session.results.length){session.ended=true;persist()}if(startNew())enterDraw()};
+$('#resumeBtn').onclick=()=>enterDraw();
+$('#resumeResults').onclick=()=>{renderResults(session,false);show('results')};
+
+function pastWinners(){const s=new Set();hist.forEach(h=>{if(h.id===session.id)return;(h.results||[]).forEach(r=>{if(r.status==='won')s.add(norm(r.name))})});return s}
+function pool(){const ex=new Set(session.results.map(r=>norm(r.name)));if(session.excludePast)pastWinners().forEach(k=>ex.add(k));
+  return session.participants.filter(n=>!ex.has(norm(n)))}
+function left(p){return p.qty-session.results.filter(r=>r.prizeId===p.id&&r.status==='won').length}
+function randInt(n){const lim=Math.floor(0x100000000/n)*n;const a=new Uint32Array(1);do{crypto.getRandomValues(a)}while(a[0]>=lim);return a[0]%n}
+
+function enterDraw(){ $('#dTitle').textContent=session.title;$('#reveal').hidden=true;anim.phase='idle';renderPrizeSel();updateMeta();show('draw')}
+function renderPrizeSel(){const sel=$('#prizeSel');const cur=sel.value;sel.innerHTML='';let first=null;
+  session.prizes.forEach(p=>{const o=document.createElement('option');o.value=p.id;const l=left(p);o.textContent=p.name+'（剩 '+l+'）';o.disabled=l<=0;if(l>0&&!first)first=p.id;sel.appendChild(o)});
+  if(!first){const o=document.createElement('option');o.value='';o.textContent='獎品都抽完了';o.disabled=true;sel.prepend(o)}
+  const curP=session.prizes.find(p=>p.id===cur);sel.value=curP&&left(curP)>0?cur:(first||'');}
+function updateMeta(){$('#dTotal').textContent=session.participants.length;const p=pool();$('#dPool').textContent=p.length;shadowNames=p.length?p:session.participants;
+  const anyLeft=session.prizes.some(x=>left(x)>0);const cb=$('#castBtn');cb.classList.toggle('bonusmode',!anyLeft&&p.length>0);cb.disabled=!p.length;cb.textContent=!p.length?'沒人可抽了':!anyLeft?'主委加碼！':(session.style==='garapon'?'轉！':'甩竿！')}
+
+function doDraw(prizeId){
+  if(anim.phase!=='idle'&&anim.phase!=='show')return;
+  const prize=session.prizes.find(p=>p.id===prizeId);if(!prize||left(prize)<=0){toast('這個獎品已經抽完了');return}
+  const p=pool();if(!p.length){toast('沒有可以抽的人了');return}
+  const name=p[randInt(p.length)];
+  session.results.push({prizeId:prize.id,prizeName:prize.name,name,comment:(session.comments||{})[norm(name)]||'',avatar:AVS[norm(name)]||'',time:new Date().toISOString(),status:'won',poolSize:p.length});
+  persist();$('#reveal').hidden=true;$('#castBtn').disabled=true;$('#prizeSel').disabled=true;
+  cast(name,prize.name);
+}
+$('#castBtn').onclick=()=>{audioInit();if($('#castBtn').classList.contains('bonusmode')){showBonus();return}doDraw($('#prizeSel').value)};
+function showBonus(){if(anim.phase!=='idle'&&anim.phase!=='show')return;$('#reveal').hidden=true;anim.phase='idle';const b=$('#bonus');b.hidden=false;b.classList.remove('pop');void b.offsetWidth;b.classList.add('pop');$('#bonusForm').hidden=true;
+  [392,523,659,784,1046,1318].forEach((f,i)=>tone(f,.3,'square',.07,0,i*.09));anim.parts=[];spawnConfetti();
+  setTimeout(()=>{$('#bonusForm').hidden=false;$('#bnName').value='';$('#bnQty').value=1},reduce?200:1800);$('#castBtn').disabled=true}
+$('#bonusForm').onsubmit=e=>{e.preventDefault();const n=$('#bnName').value.trim()||'主委加碼';const q=Math.max(1,parseInt($('#bnQty').value)||1);
+  const id='b'+uid();session.prizes.push({id,name:n,qty:q,bonus:true});persist();$('#bonus').hidden=true;renderPrizeSel();$('#prizeSel').value=id;updateMeta()};
+$('#adjBtn').onclick=()=>{if(anim.phase!=='idle'&&anim.phase!=='show')return;const w=document.createElement('div');w.style.cssText='display:flex;flex-direction:column;gap:10px';
+  const draw=()=>{w.innerHTML='';session.prizes.forEach(p=>{const won=p.qty-left(p);const r=document.createElement('div');r.className='prize-row';r.style.gridTemplateColumns='1fr 44px 44px 44px';
+    const nm=document.createElement('div');nm.innerHTML='';const b=document.createElement('b');b.textContent=p.name;const sm2=document.createElement('div');sm2.className='note';sm2.textContent='共 '+p.qty+'・已抽 '+won+'・剩 '+(p.qty-won);nm.append(b,sm2);
+    const mi=document.createElement('button');mi.className='iconbtn';mi.textContent='−';mi.setAttribute('aria-label','減少 '+p.name);mi.disabled=p.qty<=won;mi.onclick=()=>{if(p.qty>won){p.qty--;persist();draw()}};
+    const q=document.createElement('div');q.className='count';q.style.textAlign='center';q.textContent=p.qty;
+    const pl=document.createElement('button');pl.className='iconbtn';pl.textContent='＋';pl.setAttribute('aria-label','增加 '+p.name);pl.onclick=()=>{p.qty++;persist();draw()};
+    r.append(nm,mi,q,pl);w.appendChild(r)});
+    const add=document.createElement('div');add.className='row';const ni=document.createElement('input');ni.type='text';ni.id='adjNew';ni.placeholder='新增獎品名稱';ni.style.flex='1';ni.style.minWidth='140px';
+    const ab=document.createElement('button');ab.className='btn ghost';ab.textContent='新增';ab.onclick=()=>{const v=ni.value.trim();if(!v)return;session.prizes.push({id:'p'+uid(),name:v,qty:1});persist();draw()};add.append(ni,ab);w.appendChild(add);
+    const nt=document.createElement('p');nt.className='note';nt.textContent='數量不能少於已經抽出的數量。';w.appendChild(nt)};
+  draw();sheet('調整獎品',w);$('#shClose').onclick=()=>{$('#sheet').hidden=true;renderPrizeSel();updateMeta();$('#shClose').onclick=()=>$('#sheet').hidden=true}};
+$('#nextBtn').onclick=()=>{$('#reveal').hidden=true;anim.phase='idle';renderPrizeSel();updateMeta()};
+$('#redrawBtn').onclick=()=>{const r=session.results[session.results.length-1];if(!r||r.status!=='won')return;r.status='redrawn';persist();anim.phase='idle';renderPrizeSel();updateMeta();doDraw(r.prizeId)};
+$('#endBtn').onclick=()=>{if(anim.phase!=='idle'&&anim.phase!=='show')return;session.ended=true;persist();renderResults(session,false);show('results')};
+
+$('#rvAv').onclick=()=>$('#avFile').click();
+$('#avFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=160;const sz=Math.min(im.width,im.height);c.getContext('2d').drawImage(im,(im.width-sz)/2,(im.height-sz)/2,sz,sz,0,0,160,160);
+  const d=c.toDataURL('image/jpeg',.85);const lr=session.results[session.results.length-1];if(!lr)return;AVS[norm(lr.name)]=d;saveAvs();lr.avatar=d;persist();paintAv($('#rvAv'),lr.name,d);toast('大頭照已更新')};im.src=r.result};r.readAsDataURL(f)};
+
+/* ---------- results ---------- */
+let viewing=null;
+function renderResults(s,fromHistory){viewing=s;$('#rsTitle').textContent=s.title;
+  const won=s.results.filter(r=>r.status==='won').length;
+  $('#rsMeta').textContent=s.date+'・參加 '+s.participants.length+' 人・得獎 '+won+' 位'+(s.keyword?'・關鍵字「'+s.keyword+'」':'');
+  const tb=$('#rsBody');tb.innerHTML='';
+  if(!s.results.length){const tr=document.createElement('tr');tr.innerHTML='<td colspan="4" class="t">這場還沒有抽出任何人</td>';tb.appendChild(tr)}
+  s.results.forEach(r=>{const tr=document.createElement('tr');if(r.status!=='won')tr.className='redrawn';
+    [['',r.prizeName],['n',r.name],['t',hms(r.time)]].forEach(([c,v])=>{const td=document.createElement('td');td.className=c;
+      if(c==='n'){const w=document.createElement('div');w.className='ncell';const a=document.createElement('span');a.className='av sm';paintAv(a,v,r.avatar);const t=document.createElement('div');t.textContent=v;if(r.comment){const sm=document.createElement('small');sm.textContent='「'+r.comment+'」';t.appendChild(sm)}w.append(a,t);td.appendChild(w)}else td.textContent=v;tr.appendChild(td)});
+    const td=document.createElement('td');td.className='s';td.innerHTML=r.status==='won'?'<span class="tag win">得獎</span>':'<span class="tag">重抽</span>';tr.appendChild(td);tb.appendChild(tr)});
+  $('#backDraw').hidden=fromHistory;$('#againBtn').hidden=fromHistory;$('#saveBtn').hidden=fromHistory;}
+$('#saveBtn').onclick=()=>{session.saved=true;session.ended=true;persist();toast(db?'已存到紀錄（換裝置也看得到）':'已存到這台裝置的紀錄')};
+$('#backDraw').onclick=()=>{session.ended=false;persist();enterDraw()};
+$('#againBtn').onclick=()=>{session.ended=true;session.saved=true;persist();show('setup');toast('上一場已存好，可以設定新的一場')};
+
+function csvOf(s){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const rows=[['場次','日期','獎品','得獎者','時間','狀態','當下可抽人數']];
+  s.results.forEach(r=>rows.push([s.title,s.date,r.prizeName,r.name,hms(r.time),r.status==='won'?'得獎':'重抽',r.poolSize||'']));
+  return '﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n')}
+async function offer(filename,data,fallback){
+  if(!dl&&!window.claude){try{const blob=data instanceof Blob?data:new Blob([data],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);return}catch(e){}}
+  if(dl){try{await dl.save({filename,data});toast('已下載 '+filename);return}catch(e){if(e&&e.code==='declined')return}}
+  fallback();
+}
+$('#posterBtn').onclick=()=>{const s=viewing,P=$('#poster');P.innerHTML='';const add=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;e.textContent=txt;P.appendChild(e);return e};
+  add('h3','','今日漁獲');add('div','pt',s.title);const won=s.results.filter(r=>r.status==='won');add('div','pm',s.date+'・參加 '+s.participants.length+' 人・得獎 '+won.length+' 位');
+  const order=[];const g={};won.forEach(r=>{if(!g[r.prizeName]){g[r.prizeName]=[];order.push(r.prizeName)}g[r.prizeName].push(r)});
+  order.forEach(k=>{const d=document.createElement('div');d.className='pgroup';const a=document.createElement('div');a.className='pp';a.textContent=k+'（'+g[k].length+'）';d.appendChild(a);
+    g[k].forEach(r=>{const row=document.createElement('div');row.className='prow';const av=document.createElement('span');av.className='av md';paintAv(av,r.name,r.avatar);const t=document.createElement('div');t.style.minWidth='0';const e=document.createElement('div');e.className='pn';e.textContent=r.name;t.appendChild(e);
+      if(r.comment){const c=document.createElement('div');c.className='pcm';c.textContent='「'+r.comment+'」';t.appendChild(c)}row.append(av,t);d.appendChild(row)});P.appendChild(d)});
+  if(!won.length)add('div','pm','這場還沒有得獎者');add('div','hint','點一下畫面關閉');P.hidden=false;P.onclick=()=>P.hidden=true};
+$('#pngBtn').onclick=async()=>{const s=viewing;await Promise.all(s.results.filter(r=>r.avatar&&!r._img).map(r=>new Promise(res=>{const im=new Image();im.onload=()=>{Object.defineProperty(r,'_img',{value:im,enumerable:false,configurable:true});res()};im.onerror=res;im.src=r.avatar})));const c=resultImage(s);c.toBlob(blob=>{offer(s.date+'_'+s.title+'_抽獎結果.png',blob,()=>{
+  const im=new Image();im.src=c.toDataURL('image/png');const w=document.createElement('div');const p=document.createElement('p');p.className='note';p.textContent='長按圖片即可儲存到相簿。';w.append(im,p);sheet('抽獎結果圖',w)})},'image/png')};
+
+function resultImage(s){
+  const rows=s.results.filter(r=>r.status==='won');const W=1080,rowH=96,top=330,H=Math.max(1080,top+rows.length*rowH+140);
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#0b2440');g.addColorStop(1,'#1680c4');x.fillStyle=g;x.fillRect(0,0,W,H);
+  x.fillStyle='rgba(255,255,255,.06)';for(let i=0;i<6;i++){x.beginPath();x.arc(900-i*40,140+i*30,180+i*60,0,7);x.fill()}
+  x.fillStyle='#ffc93c';x.font='800 64px "Baloo 2","Noto Sans TC",sans-serif';x.fillText('今日漁獲',72,130);
+  x.fillStyle='#ffffff';x.font='900 52px "Noto Sans TC",sans-serif';x.fillText(clip(x,s.title,W-144),72,210);
+  x.fillStyle='#a9c3dc';x.font='500 34px "Noto Sans TC",sans-serif';x.fillText(s.date+'・參加 '+s.participants.length+' 人・得獎 '+rows.length+' 位',72,268);
+  rows.forEach((r,i)=>{const y=top+i*rowH;x.fillStyle=i%2?'rgba(255,255,255,.08)':'rgba(255,255,255,.14)';rr(x,56,y,W-112,rowH-12,22);x.fill();
+    x.save();x.beginPath();x.arc(104,y+42,30,0,7);x.closePath();if(r._img){x.clip();x.drawImage(r._img,74,y+12,60,60)}else{x.fillStyle=avColor(r.name);x.fill();x.fillStyle='#fff';x.font='900 30px "Noto Sans TC",sans-serif';x.textAlign='center';x.fillText((String(r.name).replace(/^[@._]+/,'')[0]||'?').toUpperCase(),104,y+53);x.textAlign='left'}x.restore();
+    x.fillStyle='#ffc93c';x.font='700 32px "Noto Sans TC",sans-serif';x.fillText(clip(x,r.prizeName,360),140,y+54);
+    x.fillStyle='#ffffff';x.font='800 40px "Baloo 2","Noto Sans TC",sans-serif';x.fillText(clip(x,r.name,W-112-560),520,y+56)});
+  if(!rows.length){x.fillStyle='#fff';x.font='700 36px "Noto Sans TC",sans-serif';x.fillText('這場還沒有得獎者',72,top+60)}
+  return c;
+}
+function clip(x,t,w){t=String(t);if(x.measureText(t).width<=w)return t;while(t.length>1&&x.measureText(t+'…').width>w)t=t.slice(0,-1);return t+'…'}
+function rr(x,a,b,w,h,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath()}
+
+/* ---------- history ---------- */
+let pendingDel=null;
+function renderHistory(){const box=$('#histList');box.innerHTML='';$('#histSrc').textContent=db?'存在你的帳號':'存在這台裝置';
+  const list=hist.filter(h=>h.results&&h.results.length);
+  if(!list.length){const p=document.createElement('p');p.className='note';p.textContent='還沒有紀錄。抽完一場後按「儲存紀錄」或「再開一場」，就會出現在這裡。';box.appendChild(p);return}
+  list.forEach(h=>{const won=h.results.filter(r=>r.status==='won').length;
+    const b=document.createElement('button');b.className='hist-item';
+    const l=document.createElement('div');const t=document.createElement('b');t.textContent=h.title;const sm=document.createElement('small');sm.textContent=h.date+'・'+hms(h.startedAt)+' 開始・參加 '+h.participants.length+' 人';l.append(t,sm);
+    const r=document.createElement('span');r.className='count';r.textContent=won+' 位';b.append(l,r);
+    b.onclick=()=>{renderResults(h,true);show('results')};box.appendChild(b);
+    if(pendingDel===h.id){const c=document.createElement('div');c.className='confirm';c.innerHTML='<span style="flex:1">確定刪除這場紀錄？</span>';
+      const y=document.createElement('button');y.className='btn red';y.textContent='刪除';y.onclick=()=>{hist=hist.filter(x=>x.id!==h.id);LS.set('fl.history',hist);if(db)db.collection('sessions').doc(h.id).delete().catch(()=>{});if(session&&session.id===h.id){session=null;LS.del('fl.session')}pendingDel=null;renderHistory()};
+      const n=document.createElement('button');n.className='btn ghost';n.textContent='取消';n.onclick=()=>{pendingDel=null;renderHistory()};c.append(y,n);box.appendChild(c)}
+    else{const d=document.createElement('button');d.className='btn ghost';d.textContent='刪除這場';d.style.cssText='align-self:flex-end;padding:6px 12px;font-size:13px';d.onclick=()=>{pendingDel=h.id;renderHistory()};box.appendChild(d)}
+  });
+}
+
+/* ---------- sound ---------- */
+let ac=null;function audioInit(){if(!S.sound||ac)return;try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+function tone(f,d,type,g,f2,delay){if(!S.sound||!ac)return;const t=ac.currentTime+(delay||0);const o=ac.createOscillator(),v=ac.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
+  v.gain.setValueAtTime(g||.15,t);v.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(v).connect(ac.destination);o.start(t);o.stop(t+d+.02)}
+
+/* ---------- stage animation ---------- */
+const cv=$('#cv'),ctx=cv.getContext('2d');let W=0,H=0;
+function resizeCanvas(){const r=$('#stage').getBoundingClientRect();if(!r.width)return;const dpr=Math.min(2,window.devicePixelRatio||1);W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+new ResizeObserver(resizeCanvas).observe($('#stage'));
+const COLORS=['#ff7a45','#ffb627','#ff4f81','#4cc9f0','#7bd389','#b388ff','#ff5d5d'];
+let shadowNames=[];const shadows=[];
+for(let i=0;i<6;i++)shadows.push({x:Math.random(),y:.25+Math.random()*.6,v:(.02+Math.random()*.03)*(Math.random()<.5?-1:1),s:.6+Math.random()*.5,name:''});
+const anim={phase:'idle',t0:0,name:'',prize:'',wait:1800,color:'#ff7a45',parts:[],splash:[]};
+const D=reduce?{back:80,fwd:120,fly:300,bite:200,reel:350}:{back:260,fwd:300,fly:650,bite:450,reel:1000};
+function cast(name,prize){if(session.style==='garapon'){startG(name,prize);return}anim.name=name;anim.prize=prize;anim.phase='cast';anim.t0=performance.now();anim.wait=reduce?300:1400+randInt(900);
+  anim.color=COLORS[randInt(COLORS.length)];anim.splash=[];anim.parts=[];tone(700,.35,'sawtooth',.06,180)}
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2, clamp=t=>Math.max(0,Math.min(1,t));
+function horizon(){return H*.40}
+function target(){return {x:W*.36,y:horizon()+(H-horizon())*.42}}
+function rodBase(){return {x:W*.98,y:H*1.03}}
+function rodLen(){return Math.min(H*.62,W*.95)}
+function tipOf(a){const b=rodBase(),L=rodLen();return {x:b.x+Math.sin(a)*L,y:b.y-Math.cos(a)*L}}
+
+function frame(now){requestAnimationFrame(frame);if($('#draw').hidden)return;if(Math.abs(cv.clientWidth-W)>1||Math.abs(cv.clientHeight-H)>1)resizeCanvas();if(!W)return;const t=now/1000;
+  ctx.fillStyle='#0d4f86';ctx.fillRect(0,0,W,H);
+  if(session&&session.style==='garapon'){if(bgImg)drawCover();frameG(now,t);drawParticles();return}
+  // sky / background
+  if(bgImg)drawCover();
+  else{const g=ctx.createLinearGradient(0,0,0,horizon());g.addColorStop(0,'#59c2f7');g.addColorStop(1,'#d6f1ff');ctx.fillStyle=g;ctx.fillRect(0,0,W,horizon()+2);
+    ctx.fillStyle='#fff3b0';ctx.beginPath();ctx.arc(W*.78,H*.12,Math.min(W,H)*.07,0,7);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.85)';[[.18,.10,1],[.52,.2,.7]].forEach(([cx,cy,s])=>{const x0=W*cx+Math.sin(t*.1)*10,y0=H*cy,r=W*.05*s;ctx.beginPath();ctx.arc(x0,y0,r,0,7);ctx.arc(x0+r,y0-r*.4,r*1.2,0,7);ctx.arc(x0+r*2.2,y0,r,0,7);ctx.fill()})}
+  // sea
+  const hz=horizon();
+  if(!bgImg||S.showSea){const g=ctx.createLinearGradient(0,hz,0,H);g.addColorStop(0,bgImg?'rgba(22,128,196,.55)':'#1a93d6');g.addColorStop(1,bgImg?'rgba(8,52,96,.85)':'#0a3f73');ctx.fillStyle=g;
+    ctx.beginPath();ctx.moveTo(0,hz);for(let x=0;x<=W;x+=10)ctx.lineTo(x,hz+Math.sin(x*.03+t*1.6)*3);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;for(let k=1;k<5;k++){const y=hz+(H-hz)*k/5;ctx.beginPath();for(let x=0;x<=W;x+=12){const yy=y+Math.sin(x*.025+t*(1.2+k*.3)+k)*4*(1+k*.3);x?ctx.lineTo(x,yy):ctx.moveTo(x,yy)}ctx.stroke()}}
+  // swimming shadows with names
+  shadows.forEach(s=>{s.x+=s.v*.016;if(s.x>1.15||s.x<-.15){s.v=-s.v;s.name=shadowNames.length?shadowNames[randInt(shadowNames.length)]:''}
+    if(!s.name&&shadowNames.length)s.name=shadowNames[randInt(shadowNames.length)];
+    const x=s.x*W,y=hz+(H-hz)*s.y,w=W*.16*s.s;ctx.save();ctx.translate(x,y);ctx.scale(s.v>0?-1:1,1);ctx.fillStyle='rgba(4,30,60,.35)';
+    ctx.beginPath();ctx.ellipse(0,0,w/2,w*.2,0,0,7);ctx.fill();ctx.beginPath();ctx.moveTo(w*.42,0);ctx.lineTo(w*.68,-w*.18);ctx.lineTo(w*.68,w*.18);ctx.fill();ctx.restore();
+    if(s.name){ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='700 '+Math.max(11,W*.03)+'px "Baloo 2","Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.fillText(clipc(s.name,w*1.4),x,y+w*.2+14)}});
+  // rod + line + bobber/fish
+  const el=now-anim.t0;let a=-.42+Math.sin(t*1.3)*.015,bob=null,fish=null,bang=false;const T=target();
+  const A_REST=-.42,A_BACK=.22,A_FWD=-.78,A_WAIT=-.55;
+  if(anim.phase==='cast'){
+    if(el<D.back)a=A_REST+(A_BACK-A_REST)*ease(el/D.back);
+    else if(el<D.back+D.fwd)a=A_BACK+(A_FWD-A_BACK)*ease((el-D.back)/D.fwd);
+    else a=A_FWD+(A_WAIT-A_FWD)*ease(clamp((el-D.back-D.fwd)/400));
+    const fs=D.back+D.fwd*.5,k=clamp((el-fs)/D.fly);const tip=tipOf(a);
+    if(k<=0)bob={x:tip.x,y:tip.y+30};else{const s0=tipOf(A_FWD);bob={x:s0.x+(T.x-s0.x)*k,y:s0.y+(T.y-s0.y)*k-Math.sin(k*Math.PI)*H*.25}}
+    if(k>=1){anim.phase='wait';anim.t0=now;spawnSplash(T,10);tone(220,.2,'sine',.08,90)}
+  }else if(anim.phase==='wait'){a=A_WAIT+Math.sin(el/300)*.01;bob={x:T.x,y:T.y+Math.sin(el/220)*3};
+    if(el>anim.wait){anim.phase='bite';anim.t0=now;tone(880,.08,'square',.06);tone(1040,.08,'square',.06,0,.12)}}
+  else if(anim.phase==='bite'){const j=Math.sin(el/40)*.03;a=A_WAIT+j-(el/D.bite)*.08;bob={x:T.x,y:T.y+10+Math.sin(el/35)*6};bang=true;
+    if(el>D.bite){anim.phase='reel';anim.t0=now;spawnSplash(T,26);for(let i=0;i<8;i++)tone(300+i*40,.05,'square',.03,0,i*.09)}}
+  else if(anim.phase==='reel'){const k=ease(clamp(el/D.reel));a=A_WAIT+(-.08-A_WAIT)*k;
+    const C={x:W*.44,y:H*.42};fish={x:T.x+(C.x-T.x)*k,y:T.y+(C.y-T.y)*k-Math.sin(k*Math.PI)*H*.12,s:.25+.75*k,r:Math.sin(el/60)*.35*(1-k)};
+    if(el>=D.reel){anim.phase='show';anim.t0=now;spawnConfetti();[523,659,784,1046].forEach((f,i)=>tone(f,.25,'triangle',.1,0,i*.11));
+      revealNow('恭喜釣到「'+anim.prize+'」')}}
+  else if(anim.phase==='show'){a=-.08+Math.sin(t*2)*.02;fish={x:W*.44,y:H*.42+Math.sin(t*2.2)*4,s:1,r:Math.sin(t*2)*.04}}
+  drawRod(a);const tip=tipOf(a);
+  if(fish){const fw=Math.min(W*.8,H*.9)*fish.s;const mouth={x:fish.x-Math.cos(fish.r)*fw*.5,y:fish.y-Math.sin(fish.r)*fw*.5};line(tip,mouth,.02);drawFish(fish.x,fish.y,fw,anim.color,anim.name,fish.r)}
+  else if(bob){line(tip,bob,anim.phase==='cast'?0:.12);drawBob(bob);if(bang){ctx.fillStyle='#ff4b3e';ctx.font='900 '+Math.max(40,W*.12)+'px "Baloo 2",sans-serif';ctx.textAlign='center';ctx.fillText('!',bob.x,bob.y-30)}}
+  else{const b={x:tip.x,y:tip.y+40+Math.sin(t*2)*3};line(tip,b,0);drawBob(b);
+    if(anim.phase==='idle'&&!$('#castBtn').disabled){ctx.fillStyle='rgba(255,255,255,.95)';ctx.font='900 '+Math.max(18,W*.055)+'px "Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.fillText('按下「甩竿！」開始抽',W*.42,hz-18)}}
+  drawParticles();
+}
+function drawParticles(){
+  [anim.splash,anim.parts].forEach(arr=>{for(let i=arr.length-1;i>=0;i--){const p=arr[i];p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0){arr.splice(i,1);continue}
+    ctx.save();ctx.globalAlpha=Math.min(1,p.life/30);ctx.fillStyle=p.c;if(p.rect){ctx.translate(p.x,p.y);ctx.rotate(p.life*.2);ctx.fillRect(-p.r,-p.r/2,p.r*2,p.r)}else{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill()}ctx.restore()}});
+}
+function revealNow(txt){$('#rvPrize').textContent=txt;$('#rvName').textContent=anim.name;const lr=session.results[session.results.length-1]||{};paintAv($('#rvAv'),anim.name,lr.avatar);$('#rvCm').textContent=lr.comment||'';$('#reveal').hidden=false;$('#prizeSel').disabled=false;renderPrizeSel();updateMeta();$('#castBtn').disabled=true}
+function drawCover(){const sc=Math.max(W/bgImg.width,H/bgImg.height);const iw=bgImg.width*sc,ih=bgImg.height*sc;ctx.drawImage(bgImg,(W-iw)/2,(H-ih)/2,iw,ih)}
+
+/* ---------- garapon (shopping-street lottery drum) ---------- */
+const BALL=['#ffcf3f','#e63946','#2a9df4','#43aa8b','#f2f2f2','#9b5de5'];
+const DG=reduce?{spin:500,drop:300,rest:100,grow:300}:{spin:1900,drop:800,rest:250,grow:700};
+function gGeom(){const tableY=H*.68;const R=Math.min(W*.30,H*.2);const br=R*.14;return {cx:W*.5,cy:tableY-R*1.3,R,tableY,br,tx:W*.5+R*.8,ty:tableY-R*.1-br}}
+function startG(name,prize){anim.name=name;anim.prize=prize;anim.phase='g_spin';anim.t0=performance.now();anim.rot0=anim.rot0||0;
+  const idx=session.prizes.findIndex(p=>p.name===prize);anim.color=BALL[(idx<0?0:idx)%BALL.length];anim.parts=[];anim.splash=[];
+  for(let i=0;i<16;i++)tone(1100+(i%2)*220,.03,'square',.03,0,i*.11)}
+function bell(){[1568,2093,1568,2093,1568,2093].forEach((f,i)=>tone(f,.2,'triangle',.08,0,i*.1))}
+function poly(cx,cy,r,rot,n){ctx.beginPath();for(let i=0;i<n;i++){const a=rot+i*2*Math.PI/n+Math.PI/n;const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath()}
+function drawLantern(x,y,s,sw){ctx.save();ctx.translate(x,y);ctx.rotate(sw);ctx.fillStyle='#2b1a12';ctx.fillRect(-s*.32,0,s*.64,s*.18);
+  ctx.fillStyle='#e63946';ctx.beginPath();ctx.ellipse(0,s*.83,s*.55,s*.65,0,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,214,120,.45)';ctx.beginPath();ctx.ellipse(0,s*.83,s*.28,s*.5,0,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(60,10,10,.35)';ctx.lineWidth=1;for(let k=1;k<5;k++){const yy=s*.18+k*s*1.3/5;const hw=Math.sqrt(Math.max(0,1-Math.pow((yy-s*.83)/(s*.65),2)))*s*.55;ctx.beginPath();ctx.moveTo(-hw,yy);ctx.lineTo(hw,yy);ctx.stroke()}
+  ctx.fillStyle='#2b1a12';ctx.fillRect(-s*.28,s*1.45,s*.56,s*.16);ctx.restore()}
+function drawBall(x,y,r,col,name){const n=parseInt(col.slice(1),16),f=.55,dk='rgb('+Math.round((n>>16)*f)+','+Math.round((n>>8&255)*f)+','+Math.round((n&255)*f)+')';
+  const gr=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.05,x,y,r);gr.addColorStop(0,'#ffffff');gr.addColorStop(.3,col);gr.addColorStop(1,dk);ctx.fillStyle=gr;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+  if(name){let fs=r*.42;const max=r*1.62;ctx.font='800 '+fs+'px "Baloo 2","Noto Sans TC",sans-serif';const mw=ctx.measureText(name).width;if(mw>max){fs=Math.max(r*.16,fs*max/mw);ctx.font='800 '+fs+'px "Baloo 2","Noto Sans TC",sans-serif'}
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=fs*.2;ctx.strokeStyle='rgba(11,36,64,.85)';const nm=clipc(name,max);ctx.strokeText(nm,x,y);ctx.fillStyle='#fff';ctx.fillText(nm,x,y);ctx.textBaseline='alphabetic'}}
+function drawDrum(g,rot){const {cx,cy,R}=g;
+  ctx.fillStyle='#8b5a2b';ctx.beginPath();ctx.moveTo(cx-R*1.05,g.tableY);ctx.lineTo(cx-R*.14,cy);ctx.lineTo(cx+R*.14,cy);ctx.lineTo(cx+R*1.05,g.tableY);ctx.lineTo(cx+R*.82,g.tableY);ctx.lineTo(cx,cy+R*.3);ctx.lineTo(cx-R*.82,g.tableY);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#8f1d1d';poly(cx+R*.09,cy-R*.07,R,rot,8);ctx.fill();
+  const gr=ctx.createRadialGradient(cx-R*.3,cy-R*.35,R*.1,cx,cy,R*1.05);gr.addColorStop(0,'#ff6b5a');gr.addColorStop(1,'#b5121b');ctx.fillStyle=gr;poly(cx,cy,R,rot,8);ctx.fill();
+  ctx.lineWidth=Math.max(3,R*.06);ctx.strokeStyle='#5c2e0e';ctx.lineJoin='round';ctx.stroke();
+  ctx.lineWidth=Math.max(1.5,R*.02);ctx.strokeStyle='rgba(92,46,14,.55)';for(let i=0;i<8;i++){const a=rot+i*Math.PI/4+Math.PI/8;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*R*.62,cy+Math.sin(a)*R*.62);ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);ctx.stroke()}
+  ctx.strokeStyle='#ffd166';ctx.lineWidth=Math.max(2,R*.035);poly(cx,cy,R*.62,rot,8);ctx.stroke();
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);ctx.fillStyle='#ffd166';ctx.font='900 '+R*.55+'px "Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('福',0,R*.03);ctx.restore();ctx.textBaseline='alphabetic';
+  const hx=cx+Math.cos(rot)*R*.9,hy=cy+Math.sin(rot)*R*.9;ctx.strokeStyle='#2b1a12';ctx.lineWidth=Math.max(4,R*.07);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(hx,hy);ctx.stroke();ctx.lineCap='butt';
+  ctx.fillStyle='#2b1a12';ctx.beginPath();ctx.arc(hx,hy,R*.11,0,7);ctx.fill();ctx.fillStyle='#ffd166';ctx.beginPath();ctx.arc(cx,cy,R*.09,0,7);ctx.fill();
+  ctx.fillStyle='#5c3a1e';rr(ctx,g.tx-R*.42,g.tableY-R*.12,R*.84,R*.13,R*.05);ctx.fill()}
+function frameG(now,t){const g=gGeom();const el=now-anim.t0;
+  if(!bgImg){const sky=ctx.createLinearGradient(0,0,0,g.tableY);sky.addColorStop(0,'#3b1f4a');sky.addColorStop(.6,'#c4553b');sky.addColorStop(1,'#f6b26b');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    for(let i=0;i<6;i++){const x=i*W/5-W*.06,w=W/5.3,h=H*(.2+((i*37)%5)*.035);ctx.fillStyle='rgba(45,20,32,.6)';ctx.fillRect(x,g.tableY-h,w,h);
+      ctx.fillStyle=i%2?'#d62828':'#1d3557';ctx.fillRect(x,g.tableY-h,w,h*.12);ctx.fillStyle='rgba(255,210,120,.55)';ctx.fillRect(x+w*.15,g.tableY-h*.6,w*.25,h*.22);ctx.fillRect(x+w*.6,g.tableY-h*.6,w*.25,h*.22)}}
+  const y0=H*.06;ctx.strokeStyle='rgba(0,0,0,.55)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,y0);ctx.quadraticCurveTo(W/2,y0+H*.06,W,y0);ctx.stroke();
+  const n=Math.max(4,Math.round(W/75));for(let i=0;i<n;i++){const u=(i+.5)/n;drawLantern(u*W,y0+(1-Math.pow(2*u-1,2))*H*.03,Math.min(W,H)*.045,Math.sin(t*1.5+i)*.06)}
+  ctx.fillStyle='#7a4a2a';ctx.fillRect(0,g.tableY-4,W,10);
+  const sw=Math.max(18,W/14);for(let x=0,i=0;x<W;x+=sw,i++){ctx.fillStyle=i%2?'#ffffff':'#d62828';ctx.fillRect(x,g.tableY+6,sw+1,H-g.tableY)}
+  ctx.fillStyle='rgba(0,0,0,.15)';ctx.fillRect(0,g.tableY+6,W,8);
+  let rot=anim.rot0||0;
+  if(anim.phase==='g_spin'){const k=clamp(el/DG.spin);rot+=ease(k)*Math.PI*4;if(Math.random()<.25)rot+=0;if(k>=1){anim.rot0=rot;anim.phase='g_drop';anim.t0=now}}
+  else if(anim.phase==='idle')rot+=Math.sin(t*1.2)*.02;
+  drawDrum(g,rot);
+  if(anim.phase==='g_drop'){const k=clamp(el/DG.drop);const sx=g.cx+g.R*.2,sy=g.cy+g.R*.9;let x=sx+(g.tx-sx)*k,y;
+    if(k<.7){const u=k/.7;y=sy+(g.ty-sy)*u*u}else{const u=(k-.7)/.3;y=g.ty-Math.sin(u*Math.PI)*g.R*.18}
+    drawBall(x,y,g.br,anim.color,'');if(k>=1){anim.phase='g_rest';anim.t0=now;bell()}}
+  else if(anim.phase==='g_rest'){drawBall(g.tx,g.ty,g.br,anim.color,'');if(el>DG.rest){anim.phase='g_grow';anim.t0=now}}
+  else if(anim.phase==='g_grow'||anim.phase==='show'){const k=anim.phase==='show'?1:ease(clamp(el/DG.grow));const BR=Math.min(W*.38,H*.27);const x=g.tx+(W*.5-g.tx)*k,y=g.ty+(H*.36-g.ty)*k;
+    ctx.fillStyle='rgba(20,8,12,'+(.45*k)+')';ctx.fillRect(0,0,W,H);
+    if(k>.3){ctx.save();ctx.translate(x,y);ctx.rotate(t*.4);ctx.fillStyle='rgba(255,224,130,'+(.3*k)+')';for(let i=0;i<12;i++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(BR*2.6,-BR*.35);ctx.lineTo(BR*2.6,BR*.35);ctx.fill()}ctx.restore()}
+    drawBall(x,y+(anim.phase==='show'?Math.sin(t*2)*4:0),g.br+(BR-g.br)*k,anim.color,k>.5?anim.name:'');
+    if(anim.phase==='g_grow'&&el>=DG.grow){anim.phase='show';anim.t0=now;spawnConfetti();[523,659,784,1046].forEach((f,i)=>tone(f,.25,'triangle',.1,0,i*.11));revealNow('恭喜抽中「'+anim.prize+'」')}}
+  else if(anim.phase==='idle'&&!$('#castBtn').disabled&&!$('#castBtn').classList.contains('bonusmode')){ctx.fillStyle='#fff';ctx.font='900 '+Math.max(18,W*.055)+'px "Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.lineWidth=5;ctx.strokeStyle='rgba(45,20,32,.8)';ctx.strokeText('按下「轉！」開始抽',W*.5,H*.2);ctx.fillText('按下「轉！」開始抽',W*.5,H*.2)}
+}
+function clipc(t,w){if(ctx.measureText(t).width<=w)return t;while(t.length>1&&ctx.measureText(t+'…').width>w)t=t.slice(0,-1);return t+'…'}
+function spawnSplash(p,n){for(let i=0;i<n;i++)anim.splash.push({x:p.x,y:p.y,vx:(Math.random()-.5)*6,vy:-Math.random()*7-2,g:.35,r:2+Math.random()*4,c:'rgba(235,250,255,.95)',life:40+Math.random()*20})}
+function spawnConfetti(){if(reduce)return;const cs=['#ffc93c','#ff4b3e','#4cc9f0','#7bd389','#ffffff','#ff4f81'];for(let i=0;i<140;i++)anim.parts.push({x:W*Math.random(),y:-20-Math.random()*H*.4,vx:(Math.random()-.5)*2,vy:Math.random()*2+1,g:.05,r:4+Math.random()*4,c:cs[i%cs.length],rect:true,life:160+Math.random()*80})}
+function drawRod(a){const b=rodBase(),tip=tipOf(a);const n={x:-(tip.y-b.y),y:tip.x-b.x};const len=Math.hypot(n.x,n.y);n.x/=len;n.y/=len;
+  const w0=Math.max(7,W*.022),w1=1.5;ctx.fillStyle='#3a2a1f';ctx.beginPath();ctx.moveTo(b.x+n.x*w0,b.y+n.y*w0);ctx.lineTo(tip.x+n.x*w1,tip.y+n.y*w1);ctx.lineTo(tip.x-n.x*w1,tip.y-n.y*w1);ctx.lineTo(b.x-n.x*w0,b.y-n.y*w0);ctx.fill();
+  const g={x:b.x+(tip.x-b.x)*.14,y:b.y+(tip.y-b.y)*.14};ctx.fillStyle='#c9d6e2';ctx.beginPath();ctx.arc(g.x-n.x*w0*2.2,g.y-n.y*w0*2.2,w0*1.8,0,7);ctx.fill();ctx.fillStyle='#ff4b3e';ctx.beginPath();ctx.arc(g.x-n.x*w0*2.2,g.y-n.y*w0*2.2,w0*.7,0,7);ctx.fill();
+  ctx.fillStyle='#ffc93c';for(let k=.3;k<.95;k+=.18){const p={x:b.x+(tip.x-b.x)*k,y:b.y+(tip.y-b.y)*k};ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,7);ctx.fill()}}
+function line(p,q,sag){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(p.x,p.y);const mx=(p.x+q.x)/2,my=(p.y+q.y)/2+Math.hypot(q.x-p.x,q.y-p.y)*sag;ctx.quadraticCurveTo(mx,my,q.x,q.y);ctx.stroke()}
+function drawBob(b){const r=Math.max(8,W*.022);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(b.x,b.y,r,0,Math.PI);ctx.fill();ctx.fillStyle='#ff4b3e';ctx.beginPath();ctx.arc(b.x,b.y,r,Math.PI,0);ctx.fill();ctx.fillStyle='#222';ctx.fillRect(b.x-1,b.y-r-8,2,8)}
+function drawFish(x,y,fw,col,name,rot){const fh=fw*.42;ctx.save();ctx.translate(x,y);ctx.rotate(rot);
+  ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(fw*.38,0);ctx.lineTo(fw*.62,-fh*.55);ctx.quadraticCurveTo(fw*.54,0,fw*.62,fh*.55);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(-fw*.1,-fh*.45);ctx.quadraticCurveTo(fw*.08,-fh*.85,fw*.25,-fh*.4);ctx.fill();
+  ctx.beginPath();ctx.ellipse(0,0,fw*.5,fh*.5,0,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.ellipse(-fw*.02,fh*.2,fw*.4,fh*.2,0,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=fw*.012;ctx.beginPath();ctx.arc(-fw*.22,0,fh*.42,-1.1,1.1);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-fw*.34,-fh*.1,fh*.11,0,7);ctx.fill();ctx.fillStyle='#0b2440';ctx.beginPath();ctx.arc(-fw*.35,-fh*.1,fh*.06,0,7);ctx.fill();
+  let fs=fh*.42;const maxW=fw*.62;ctx.font='800 '+fs+'px "Baloo 2","Noto Sans TC",sans-serif';const mw=ctx.measureText(name).width;if(mw>maxW){fs=Math.max(fh*.16,fs*maxW/mw);ctx.font='800 '+fs+'px "Baloo 2","Noto Sans TC",sans-serif'}
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=fs*.18;ctx.strokeStyle='rgba(11,36,64,.75)';const nm=clipc(name,maxW);ctx.strokeText(nm,fw*.05,fh*.02);ctx.fillStyle='#fff';ctx.fillText(nm,fw*.05,fh*.02);ctx.textBaseline='alphabetic';
+  ctx.restore()}
+requestAnimationFrame(frame);
+
+/* ---------- boot ---------- */
+loadBg();loadBonus();refreshSetup();renderStyle();if(!LS.get('fl.toured',0))setTimeout(tourOpen,400);
+})();
+</script>
+</body></html>
