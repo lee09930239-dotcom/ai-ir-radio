@@ -35,7 +35,7 @@ button{cursor:pointer}
 .card h2 small{font-weight:500;color:var(--muted);font-size:13px}
 .lbl{font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.04em}
 .field{display:flex;flex-direction:column;gap:6px;min-width:0}
-input[type=text],input[type=number],textarea,select{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#f7fbff;width:100%;box-sizing:border-box}
+input[type=text],input[type=url],input[type=password],input[type=number],textarea,select{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#f7fbff;width:100%;box-sizing:border-box}
 textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .prize-row{display:grid;grid-template-columns:1fr 84px 40px;gap:8px;align-items:center}
@@ -75,6 +75,9 @@ textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
 .tour-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .tour-btns .btn{padding:10px 6px;font-size:15px;width:100%}
 .tour-tip .note{font-size:12px}
+.autoimp{background:#fff4f2;border:2px solid #ffd2cc;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.igstate{font-weight:900;color:var(--muted)}
+.igstate.ok{color:var(--ok)}
 .howto{background:#f2f8fd;border-radius:12px;padding:10px 12px}
 .howto summary{font-weight:900;color:var(--deep);cursor:pointer}
 .howto ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;line-height:1.55;font-size:15px}
@@ -180,22 +183,20 @@ tr.redrawn td.s{text-decoration:none}
 
     <div class="card" data-tour="people">
       <h2>參加者 <small>符合資格的留言帳號</small></h2>
-      <details class="howto"><summary>教學：怎麼把 IG 直播留言放進來</summary>
-        <ol>
-          <li>開播時先公告：「留言 <b>+1</b> 參加抽獎」（關鍵字可以自己改）。</li>
-          <li>截止時，用另一支手機或請小幫手把留言區截圖。往上滑多截幾張，重疊沒關係。</li>
-          <li>回到這裡按「從留言截圖匯入」，一次選多張。系統會讀出含關鍵字的留言帳號，重複的只算一次。</li>
-          <li>檢查下面的名單，不符資格的（例如分身帳號）按 × 排除。</li>
-          <li>也可以直接貼上留言文字，或在下面手動輸入帳號。</li>
-        </ol>
-      </details>
-      <div class="field">
-        <a class="btn ghost" href="https://app-sorteos.com/en/apps/export-instagram-comments" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">① 到 App Sorteos 匯出貼文留言 ↗</a>
-        <label class="btn" for="impFile" style="display:block;text-align:center">② 匯入剛下載的檔案（CSV／Excel）</label>
-        <input id="impFile" type="file" accept=".csv,.xlsx,.xls,.txt,text/csv" hidden>
-        <p class="note" id="impStatus">在 App Sorteos 貼上貼文網址、匯出成 CSV 或 Excel，再按②選那個檔案。帳號、留言（有的話連大頭照）會一次匯入，再依關鍵字篩選。</p>
+      <div class="autoimp">
+        <div class="field"><label class="lbl" for="postUrl">IG 貼文網址</label><input id="postUrl" type="url" inputmode="url" placeholder="https://www.instagram.com/p/……" autocomplete="off"></div>
+        <div class="field"><label class="lbl" for="kw">留言關鍵字（留空 = 所有留言都算）</label><input id="kw" type="text" maxlength="20" placeholder="例如 +1"></div>
+        <button class="btn red" id="autoBtn" style="font-size:18px;padding:14px">自動抓留言</button>
+        <p class="note" id="autoStatus"></p>
       </div>
-      <div class="field"><label class="lbl" for="kw">留言關鍵字（留空 = 每行都算）</label><input id="kw" type="text" maxlength="20" placeholder="例如 +1"></div>
+      <details class="howto"><summary>其他匯入方式（App Sorteos 檔案、截圖、貼上）</summary>
+        <div class="field" style="margin-top:10px">
+          <a class="btn ghost" href="https://app-sorteos.com/en/apps/export-instagram-comments" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">① 到 App Sorteos 匯出貼文留言 ↗</a>
+          <label class="btn ghost" for="impFile" style="display:block;text-align:center">② 匯入剛下載的檔案（CSV／Excel）</label>
+          <input id="impFile" type="file" accept=".csv,.xlsx,.xls,.txt,text/csv" hidden>
+          <p class="note" id="impStatus">App Sorteos 匯出成 CSV 或 Excel 後，按②選那個檔案。</p>
+        </div>
+      </details>
       <div class="field" id="ocrBox">
         <label class="btn" for="ocrFile" style="text-align:center">從留言截圖匯入</label>
         <input id="ocrFile" type="file" accept="image/*" multiple hidden>
@@ -212,6 +213,14 @@ tr.redrawn td.s{text-decoration:none}
       </div>
       <div class="row" style="justify-content:space-between"><span>符合資格：<span class="count" id="pCount">0</span> 人</span><button class="btn ghost" id="clearPaste">清空</button></div>
       <div class="chips" id="pChips"></div>
+    </div>
+
+    <div class="card" data-tour="ig">
+      <h2>IG 連線 <small>一次設定，之後自動抓留言</small></h2>
+      <div class="igstate" id="igState">還沒連線</div>
+      <div class="field"><label class="lbl" for="igToken">存取權杖（Access Token）</label><input id="igToken" type="password" autocomplete="off" placeholder="貼上 IG 存取權杖"></div>
+      <div class="row"><button class="btn" id="igSave">連線</button><button class="btn ghost" id="igClear">中斷連線</button></div>
+      <p class="note">權杖只存在這支手機，不會傳到別的地方。權杖 60 天到期，這裡每次使用時會自動延長。</p>
     </div>
 
     <div class="card" data-tour="style">
@@ -454,7 +463,8 @@ const TOUR=[
  ['nav','切換頁面','「設定」是現在這一頁。「紀錄」可以照日期看以前每一場的抽獎結果。'],
  ['event','今天的場次','填這場直播的名稱。日期會自動帶入，之後在紀錄裡會用日期和名稱找到它。'],
  ['prize','獎品','輸入獎品名稱和數量，按「＋ 新增獎品」可以加更多。抽獎時還可以按「調整獎品」臨時加減。'],
- ['people','參加者','把 IG 留言放進來：最快是按①到 App Sorteos 匯出貼文留言，再按②匯入下載的檔案，帳號和留言（有的話連大頭照）會一次進來；也可以「從留言截圖匯入」、整段貼上留言，或手動輸入帳號。設定關鍵字（例如 +1）只會留下有打關鍵字的人。名單上按 × 可以排除不符資格的帳號。'],
+ ['people','參加者','貼上 IG 貼文網址、填關鍵字（例如 +1），按「自動抓留言」，符合的帳號和留言會一次進來。名單上按 × 可以排除不符資格的帳號。抓不到時可以用「其他匯入方式」。'],
+ ['ig','IG 連線','第一次使用要貼上 IG 存取權杖，連線後就能自動抓自己帳號貼文的留言。權杖只存在這支手機。'],
  ['style','抽獎畫面','選擇抽獎動畫：「海釣」是甩竿釣出寫著名字的魚，「商店街抽獎桶」是轉動抽獎桶，掉出寫著名字的珠珠。'],
  ['rules','規則','同一場中過獎或被重抽的人，不會再被抽到。獎品抽完會出現「主委加碼」按鈕，只有按「結束抽獎」才會結束。'],
  ['bonus','主委加碼圖片','上傳按下「主委加碼」時要跳出來的照片。照片只存在這支手機上。'],
@@ -482,6 +492,34 @@ $('#tour').addEventListener('wheel',e=>{window.scrollBy(0,e.deltaY);requestAnima
 let tY=null;$('#tour').addEventListener('touchstart',e=>{tY=e.touches[0].clientY},{passive:true});
 $('#tour').addEventListener('touchmove',e=>{if(tY==null||$('#tourTip').contains(e.target))return;const y=e.touches[0].clientY;window.scrollBy(0,tY-y);tY=y;tourPlace()},{passive:true});
 addEventListener('scroll',()=>{if(!$('#tour').hidden)tourPlace()},{passive:true});addEventListener('resize',()=>{if(!$('#tour').hidden)tourPlace()});
+
+/* ---------- IG auto import (Instagram API with Instagram Login) ---------- */
+const IGB='https://graph.instagram.com';
+let IG=LS.get('fl.ig',null);
+function igRender(){const el=$('#igState');if(IG&&IG.token){el.textContent='已連線：@'+(IG.user||'');el.className='igstate ok'}else{el.textContent='還沒連線（要先設定才能自動抓留言）';el.className='igstate'}}
+async function igGet(path,params){const u=new URL(path.startsWith('http')?path:IGB+path);if(params)Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));if(!u.searchParams.has('access_token'))u.searchParams.set('access_token',IG.token);
+  const r=await fetch(u.toString());const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error((j.error&&j.error.message)||('HTTP '+r.status));return j}
+async function igRefresh(){if(!IG||!IG.token)return;if(Date.now()-(IG.refreshed||0)<7*864e5)return;
+  try{const j=await igGet('/refresh_access_token',{grant_type:'ig_refresh_token'});if(j.access_token){IG.token=j.access_token;IG.refreshed=Date.now();LS.set('fl.ig',IG)}}catch(e){}}
+$('#igSave').onclick=async()=>{const t=$('#igToken').value.trim();if(!t){toast('請先貼上權杖');return}IG={token:t};
+  try{const me=await igGet('/me',{fields:'user_id,username'});IG.user=me.username;IG.refreshed=0;LS.set('fl.ig',IG);$('#igToken').value='';igRender();toast('已連線 @'+me.username);igRefresh()}
+  catch(e){IG=null;igRender();toast('連線失敗：'+e.message)}};
+$('#igClear').onclick=()=>{IG=null;LS.del('fl.ig');igRender();toast('已中斷連線')};
+function shortcodeOf(url){const m=String(url).match(/instagram\.com\/(?:[^\/]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);return m?m[1]:''}
+$('#autoBtn').onclick=async()=>{const st=$('#autoStatus');const url=$('#postUrl').value.trim();
+  if(!IG||!IG.token){st.textContent='還沒連上 IG。請先到下面「IG 連線」貼上權杖，或改用「其他匯入方式」。';return}
+  const code=shortcodeOf(url);if(!code){st.textContent='網址看起來不是 IG 貼文，請貼像 https://www.instagram.com/p/xxxx/ 的網址。';return}
+  $('#autoBtn').disabled=true;try{await igRefresh();st.textContent='尋找這篇貼文…';
+    let media=null,next='/me/media',params={fields:'id,permalink,shortcode,caption',limit:'50'},pages=0;
+    while(next&&!media&&pages<20){const j=await igGet(next,params);params=null;pages++;media=(j.data||[]).find(m=>m.shortcode===code||(m.permalink||'').includes('/'+code));next=j.paging&&j.paging.next}
+    if(!media)throw new Error('找不到這篇貼文（只能抓連線帳號自己的貼文）');
+    st.textContent='抓留言中…';const lines=[];next='/'+media.id+'/comments';params={fields:'id,username,text,timestamp',limit:'50'};pages=0;
+    while(next&&pages<100){const j=await igGet(next,params);params=null;pages++;(j.data||[]).forEach(c=>{if(c.username)lines.push(c.username+' '+String(c.text||'').replace(/\s+/g,' '))});next=j.paging&&j.paging.next;st.textContent='抓留言中…（'+lines.length+' 則）'}
+    S.paste=lines.join('\n');S.manual=[];S.removed=[];$('#paste').value=S.paste;saveSettings();renderChips();
+    st.textContent='抓到 '+lines.length+' 則留言，符合關鍵字的有 '+$('#pCount').textContent+' 人，名單在下面。'}
+  catch(e){st.textContent=/Failed to fetch|NetworkError|Load failed/i.test(e.message)?'連不到 IG（這個網址版本可能被擋），請改用「其他匯入方式」。':'沒抓成功：'+e.message}
+  finally{$('#autoBtn').disabled=false}};
+igRender();
 
 /* ---------- file import (App Sorteos export) ---------- */
 function parseCSV(t){const rows=[];let row=[],f='',q=false;t=t.replace(/^﻿/,'');const sep=(t.split('\n')[0].match(/;/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?';':(t.split('\n')[0].includes('\t')?'\t':',');
