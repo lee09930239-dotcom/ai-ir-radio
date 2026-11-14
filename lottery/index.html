@@ -190,8 +190,10 @@ tr.redrawn td.s{text-decoration:none}
         </ol>
       </details>
       <div class="field">
-        <a class="btn" href="https://app-sorteos.com/en" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">用 App Sorteos 抓貼文留言名單 ↗</a>
-        <p class="note">打開後用 IG 登入、選貼文、設關鍵字，它會列出參加者。把名單複製回來，貼到下面的「貼上留言」，就能用這裡的畫面抽獎。</p>
+        <a class="btn ghost" href="https://app-sorteos.com/en/apps/export-instagram-comments" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">① 到 App Sorteos 匯出貼文留言 ↗</a>
+        <label class="btn" for="impFile" style="display:block;text-align:center">② 匯入剛下載的檔案（CSV／Excel）</label>
+        <input id="impFile" type="file" accept=".csv,.xlsx,.xls,.txt,text/csv" hidden>
+        <p class="note" id="impStatus">在 App Sorteos 貼上貼文網址、匯出成 CSV 或 Excel，再按②選那個檔案。帳號、留言（有的話連大頭照）會一次匯入，再依關鍵字篩選。</p>
       </div>
       <div class="field"><label class="lbl" for="kw">留言關鍵字（留空 = 每行都算）</label><input id="kw" type="text" maxlength="20" placeholder="例如 +1"></div>
       <div class="field" id="ocrBox">
@@ -452,7 +454,7 @@ const TOUR=[
  ['nav','切換頁面','「設定」是現在這一頁。「紀錄」可以照日期看以前每一場的抽獎結果。'],
  ['event','今天的場次','填這場直播的名稱。日期會自動帶入，之後在紀錄裡會用日期和名稱找到它。'],
  ['prize','獎品','輸入獎品名稱和數量，按「＋ 新增獎品」可以加更多。抽獎時還可以按「調整獎品」臨時加減。'],
- ['people','參加者','把 IG 留言放進來：最快是按「用 App Sorteos 抓貼文留言名單」，把名單複製回來貼上；也可以「從留言截圖匯入」、整段貼上留言，或手動輸入帳號。設定關鍵字（例如 +1）只會留下有打關鍵字的人。名單上按 × 可以排除不符資格的帳號。'],
+ ['people','參加者','把 IG 留言放進來：最快是按①到 App Sorteos 匯出貼文留言，再按②匯入下載的檔案，帳號和留言（有的話連大頭照）會一次進來；也可以「從留言截圖匯入」、整段貼上留言，或手動輸入帳號。設定關鍵字（例如 +1）只會留下有打關鍵字的人。名單上按 × 可以排除不符資格的帳號。'],
  ['style','抽獎畫面','選擇抽獎動畫：「海釣」是甩竿釣出寫著名字的魚，「商店街抽獎桶」是轉動抽獎桶，掉出寫著名字的珠珠。'],
  ['rules','規則','同一場中過獎或被重抽的人，不會再被抽到。獎品抽完會出現「主委加碼」按鈕，只有按「結束抽獎」才會結束。'],
  ['bonus','主委加碼圖片','上傳按下「主委加碼」時要跳出來的照片。照片只存在這支手機上。'],
@@ -480,6 +482,32 @@ $('#tour').addEventListener('wheel',e=>{window.scrollBy(0,e.deltaY);requestAnima
 let tY=null;$('#tour').addEventListener('touchstart',e=>{tY=e.touches[0].clientY},{passive:true});
 $('#tour').addEventListener('touchmove',e=>{if(tY==null||$('#tourTip').contains(e.target))return;const y=e.touches[0].clientY;window.scrollBy(0,tY-y);tY=y;tourPlace()},{passive:true});
 addEventListener('scroll',()=>{if(!$('#tour').hidden)tourPlace()},{passive:true});addEventListener('resize',()=>{if(!$('#tour').hidden)tourPlace()});
+
+/* ---------- file import (App Sorteos export) ---------- */
+function parseCSV(t){const rows=[];let row=[],f='',q=false;t=t.replace(/^﻿/,'');const sep=(t.split('\n')[0].match(/;/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?';':(t.split('\n')[0].includes('\t')?'\t':',');
+  for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===sep){row.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f=''}else f+=c}
+  if(f||row.length){row.push(f);rows.push(row)}return rows.filter(r=>r.some(x=>String(x).trim()))}
+async function readRows(file){const name=file.name.toLowerCase();
+  if(/\.xlsx?$/.test(name)){if(!window.XLSX)await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=res;sc.onerror=()=>rej(new Error('load'));document.head.appendChild(sc)});
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}).map(r=>r.map(String))}
+  return parseCSV(await file.text())}
+function pickCol(h,res){for(const re of res){const i=h.findIndex(x=>re.test(x));if(i>=0)return i}return -1}
+$('#impFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const st=$('#impStatus');st.textContent='匯入中…';
+  try{const rows=await readRows(f);if(!rows.length)throw new Error('empty');
+    let hi=rows.findIndex(r=>r.some(c=>/user|usuario|帳號|account|username|handle/i.test(c)));if(hi<0)hi=0;const h=rows[hi].map(x=>String(x).trim().toLowerCase());
+    let cu=pickCol(h,[/^user ?name$|^username$/,/usuario/,/user|帳號|account|handle/,/name|nombre|名稱/]);
+    let cc=pickCol(h,[/^comment$|^comments$/,/comentario/,/comment|留言|text|texto|message|mensaje/]);
+    let ca=pickCol(h,[/profile.?pic|avatar|大頭照/,/pic|photo|foto|image|imagen|img/]);
+    const body=rows.slice(hi+1);if(cu<0){cu=0;if(cc<0&&rows[hi].length>1)cc=1}
+    const lines=[];let nav=0;
+    body.forEach(r=>{let u=String(r[cu]||'').trim().replace(/^@+/,'').replace(/\s+/g,'');if(!u)return;
+      const c=cc>=0?String(r[cc]||'').replace(/\s+/g,' ').trim():'';lines.push(u+(c?' '+c:''));
+      const a=ca>=0?String(r[ca]||'').trim():'';if(/^https?:\/\//.test(a)){AVS[norm(u)]=a;nav++}});
+    if(!lines.length)throw new Error('norows');
+    S.paste=(S.paste.trim()&&!/^fishing_tom \+1/.test(S.paste)?S.paste.trim()+'\n':'')+lines.join('\n');S.removed=[];$('#paste').value=S.paste;saveSettings();if(nav)saveAvs();renderChips();
+    st.textContent='已匯入 '+lines.length+' 則留言'+(nav?'、'+nav+' 張大頭照':'（這個檔案沒有大頭照欄位）')+'，符合關鍵字的人在下面名單。'}
+  catch(err){st.textContent='這個檔案讀不出來，請確認是 App Sorteos 匯出的 CSV 或 Excel；也可以把檔案傳給 Claude 看格式。'}};
 
 /* ---------- screenshot import ---------- */
 function joinUserLines(lines){const isUser=l=>/^@?[A-Za-z0-9._]{2,30}$/.test(l);const out=[];
@@ -617,7 +645,7 @@ $('#posterBtn').onclick=()=>{const s=viewing,P=$('#poster');P.innerHTML='';const
     g[k].forEach(r=>{const row=document.createElement('div');row.className='prow';const av=document.createElement('span');av.className='av md';paintAv(av,r.name,r.avatar);const t=document.createElement('div');t.style.minWidth='0';const e=document.createElement('div');e.className='pn';e.textContent=r.name;t.appendChild(e);
       if(r.comment){const c=document.createElement('div');c.className='pcm';c.textContent='「'+r.comment+'」';t.appendChild(c)}row.append(av,t);d.appendChild(row)});P.appendChild(d)});
   if(!won.length)add('div','pm','這場還沒有得獎者');add('div','hint','點一下畫面關閉');P.hidden=false;P.onclick=()=>P.hidden=true};
-$('#pngBtn').onclick=async()=>{const s=viewing;await Promise.all(s.results.filter(r=>r.avatar&&!r._img).map(r=>new Promise(res=>{const im=new Image();im.onload=()=>{Object.defineProperty(r,'_img',{value:im,enumerable:false,configurable:true});res()};im.onerror=res;im.src=r.avatar})));const c=resultImage(s);c.toBlob(blob=>{offer(s.date+'_'+s.title+'_抽獎結果.png',blob,()=>{
+$('#pngBtn').onclick=async()=>{const s=viewing;await Promise.all(s.results.filter(r=>r.avatar&&!r._img).map(r=>new Promise(res=>{const im=new Image();if(/^https?:/.test(r.avatar))im.crossOrigin='anonymous';im.onload=()=>{Object.defineProperty(r,'_img',{value:im,enumerable:false,configurable:true});res()};im.onerror=res;im.src=r.avatar})));const c=resultImage(s);c.toBlob(blob=>{offer(s.date+'_'+s.title+'_抽獎結果.png',blob,()=>{
   const im=new Image();im.src=c.toDataURL('image/png');const w=document.createElement('div');const p=document.createElement('p');p.className='note';p.textContent='長按圖片即可儲存到相簿。';w.append(im,p);sheet('抽獎結果圖',w)})},'image/png')};
 
 function resultImage(s){
