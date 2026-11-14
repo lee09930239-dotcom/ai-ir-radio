@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0b2440"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style></head><body>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0b2440"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style></head><body>
 <title>直播抽獎台</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -109,6 +109,16 @@ textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
 .stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .reveal{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(255,255,255,.96);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .reveal .pz{font-weight:900;color:var(--buoy);font-size:18px}
+.who{display:flex;align-items:center;gap:12px;justify-content:center;min-width:0}
+.av{flex:none;width:64px;height:64px;border-radius:50%;background:#dfe9f3 center/cover no-repeat;border:3px solid var(--kelp);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:28px;color:#fff;cursor:pointer;padding:0}
+.av.sm{width:34px;height:34px;font-size:15px;border-width:2px;cursor:default}
+.av.md{width:52px;height:52px;font-size:22px;cursor:default}
+.cm{font-size:16px;color:var(--muted);font-weight:700;line-height:1.45;word-break:break-word}
+.cm:not(:empty)::before{content:"「"}.cm:not(:empty)::after{content:"」"}
+.pgroup .prow{display:flex;align-items:center;gap:12px;min-width:0}
+.pgroup .pcm{font-size:14px;color:#cfe0f0;font-weight:700}
+td.n .ncell{display:flex;align-items:center;gap:8px}
+td.n small{display:block;font-weight:500;color:var(--muted);font-size:12px}
 .reveal .nm{font-family:var(--display);font-weight:800;font-size:clamp(28px,9vw,52px);line-height:1.05;word-break:break-all;color:var(--navy)}
 .reveal .row{justify-content:center}
 .reveal .row .btn{flex:1;min-width:120px}
@@ -179,6 +189,10 @@ tr.redrawn td.s{text-decoration:none}
           <li>也可以直接貼上留言文字，或在下面手動輸入帳號。</li>
         </ol>
       </details>
+      <div class="field">
+        <a class="btn" href="https://app-sorteos.com/en" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">用 App Sorteos 抓貼文留言名單 ↗</a>
+        <p class="note">打開後用 IG 登入、選貼文、設關鍵字，它會列出參加者。把名單複製回來，貼到下面的「貼上留言」，就能用這裡的畫面抽獎。</p>
+      </div>
       <div class="field"><label class="lbl" for="kw">留言關鍵字（留空 = 每行都算）</label><input id="kw" type="text" maxlength="20" placeholder="例如 +1"></div>
       <div class="field" id="ocrBox">
         <label class="btn" for="ocrFile" style="text-align:center">從留言截圖匯入</label>
@@ -249,7 +263,9 @@ tr.redrawn td.s{text-decoration:none}
     <canvas id="cv"></canvas>
     <div class="reveal" id="reveal" hidden>
       <div class="pz" id="rvPrize"></div>
-      <div class="nm" id="rvName"></div>
+      <div class="who"><button class="av" id="rvAv" aria-label="設定得獎者大頭照"></button><div class="nm" id="rvName"></div></div>
+      <div class="cm" id="rvCm"></div>
+      <input id="avFile" type="file" accept="image/*" hidden>
       <div class="row"><button class="btn red" id="nextBtn">下一抽</button><button class="btn ghost" id="redrawBtn">重抽（沒回應／不符資格）</button></div>
     </div>
     <div class="bonus" id="bonus" hidden>
@@ -378,11 +394,16 @@ function show(id){['setup','draw','results','history'].forEach(s=>$('#'+s).hidde
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
 
 /* ---------- participants ---------- */
+let CMT={};let AVS=LS.get('fl.avatars',{});
+function saveAvs(){if(!LS.set('fl.avatars',AVS)){const ks=Object.keys(AVS);ks.slice(0,Math.ceil(ks.length/2)).forEach(k=>delete AVS[k]);LS.set('fl.avatars',AVS)}}
+function avColor(n){let h=0;for(const ch of norm(n))h=(h*31+ch.charCodeAt(0))>>>0;return ['#ff7a45','#2a9df4','#43aa8b','#9b5de5','#e63946','#f4a261'][h%6]}
+function paintAv(el,name,url){el.style.backgroundImage=url?'url("'+url+'")':'';el.style.backgroundColor=url?'':avColor(name);el.textContent=url?'':(String(name).replace(/^[@._]+/,'')[0]||'?').toUpperCase()}
 function parse(){
   const kw=S.keyword.trim().toLowerCase();const seen=new Map();const removed=new Set(S.removed);
   const add=n=>{const k=norm(n);if(!k||removed.has(k)||seen.has(k))return;seen.set(k,n.trim().replace(/^@+/,''))};
+  CMT={};
   S.paste.split(/\r?\n/).forEach(line=>{line=line.trim();if(!line)return;if(kw&&!line.toLowerCase().includes(kw))return;
-    const m=line.match(/^@?([^\s:：,，]+)/);if(m)add(m[1])});
+    const m=line.match(/^@?([^\s:：,，]+)[\s:：,，]*(.*)$/);if(m){const k=norm(m[1]);if(m[2]&&!CMT[k])CMT[k]=m[2].slice(0,120);add(m[1])}});
   S.manual.forEach(add);
   return [...seen.values()];
 }
@@ -431,7 +452,7 @@ const TOUR=[
  ['nav','切換頁面','「設定」是現在這一頁。「紀錄」可以照日期看以前每一場的抽獎結果。'],
  ['event','今天的場次','填這場直播的名稱。日期會自動帶入，之後在紀錄裡會用日期和名稱找到它。'],
  ['prize','獎品','輸入獎品名稱和數量，按「＋ 新增獎品」可以加更多。抽獎時還可以按「調整獎品」臨時加減。'],
- ['people','參加者','把 IG 留言放進來：可以「從留言截圖匯入」、整段貼上留言，或手動輸入帳號。設定關鍵字（例如 +1）只會留下有打關鍵字的人。名單上按 × 可以排除不符資格的帳號。'],
+ ['people','參加者','把 IG 留言放進來：最快是按「用 App Sorteos 抓貼文留言名單」，把名單複製回來貼上；也可以「從留言截圖匯入」、整段貼上留言，或手動輸入帳號。設定關鍵字（例如 +1）只會留下有打關鍵字的人。名單上按 × 可以排除不符資格的帳號。'],
  ['style','抽獎畫面','選擇抽獎動畫：「海釣」是甩竿釣出寫著名字的魚，「商店街抽獎桶」是轉動抽獎桶，掉出寫著名字的珠珠。'],
  ['rules','規則','同一場中過獎或被重抽的人，不會再被抽到。獎品抽完會出現「主委加碼」按鈕，只有按「結束抽獎」才會結束。'],
  ['bonus','主委加碼圖片','上傳按下「主委加碼」時要跳出來的照片。照片只存在這支手機上。'],
@@ -463,10 +484,16 @@ addEventListener('scroll',()=>{if(!$('#tour').hidden)tourPlace()},{passive:true}
 /* ---------- screenshot import ---------- */
 function joinUserLines(lines){const isUser=l=>/^@?[A-Za-z0-9._]{2,30}$/.test(l);const out=[];
   for(let i=0;i<lines.length;i++){const l=lines[i].trim();if(!l)continue;if(isUser(l)&&lines[i+1]&&!isUser(lines[i+1].trim())){out.push(l+' '+lines[i+1].trim());i++}else out.push(l)}return out}
+async function cropAvatars(file,lines){const bmp=await createImageBitmap(file);let n=0;
+  lines.forEach(l=>{const t=(l.text||'').trim();const m=t.match(/^@?([A-Za-z0-9._]{2,30})(\s|$)/);if(!m||!l.bbox)return;const k=norm(m[1]);if(AVS[k])return;
+    const b=l.bbox,lh=b.y1-b.y0,size=lh*2.6,cx=b.x0-size*.68,cy=(b.y0+b.y1)/2+lh*.55;if(cx-size/2<0||cy-size/2<0||cy+size/2>bmp.height)return;
+    const c=document.createElement('canvas');c.width=c.height=96;c.getContext('2d').drawImage(bmp,cx-size/2,cy-size/2,size,size,0,0,96,96);AVS[k]=c.toDataURL('image/jpeg',.8);n++});
+  if(n)saveAvs()}
 async function tessRead(files,st){
   if(!window.Tesseract){st.textContent='第一次使用要下載文字辨識工具，請稍等…';await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';sc.onload=res;sc.onerror=()=>rej(new Error('load'));document.head.appendChild(sc)})}
   const worker=await Tesseract.createWorker('eng');const all=[];
-  for(let i=0;i<files.length;i++){st.textContent='讀取截圖中…（'+(i+1)+'/'+files.length+'）';const {data}=await worker.recognize(files[i]);all.push(...joinUserLines(data.text.split(/\n/)))}
+  for(let i=0;i<files.length;i++){st.textContent='讀取截圖中…（'+(i+1)+'/'+files.length+'）';const {data}=await worker.recognize(files[i]);all.push(...joinUserLines(data.text.split(/\n/)));
+    try{await cropAvatars(files[i],data.lines||[])}catch(e){}}
   await worker.terminate();return all}
 $('#ocrFile').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;
   if(!sm){const st=$('#ocrStatus');try{const lines=await tessRead(files,st);if(lines.length){S.paste=(S.paste.trim()?S.paste.trim()+'\n':'')+lines.join('\n');$('#paste').value=S.paste;saveSettings();renderChips()}
@@ -503,7 +530,7 @@ function startNew(){
   if(!prizes.length){toast('請先設定至少一個獎品');return false}
   if(!ps.length){toast('還沒有符合資格的參加者');return false}
   session={id:today()+'-'+uid(),date:today(),title:S.title.trim()||'直播抽獎',startedAt:new Date().toISOString(),
-    keyword:S.keyword,excludePast:S.excludePast,style:S.style||'fish',participants:ps,prizes,results:[],ended:false};
+    comments:Object.fromEntries(ps.map(n=>[norm(n),CMT[norm(n)]||'']).filter(e=>e[1])),keyword:S.keyword,excludePast:S.excludePast,style:S.style||'fish',participants:ps,prizes,results:[],ended:false};
   persist();return true;
 }
 $('#startBtn').onclick=()=>{if(session&&!session.ended&&session.results.length){session.ended=true;persist()}if(startNew())enterDraw()};
@@ -529,7 +556,7 @@ function doDraw(prizeId){
   const prize=session.prizes.find(p=>p.id===prizeId);if(!prize||left(prize)<=0){toast('這個獎品已經抽完了');return}
   const p=pool();if(!p.length){toast('沒有可以抽的人了');return}
   const name=p[randInt(p.length)];
-  session.results.push({prizeId:prize.id,prizeName:prize.name,name,time:new Date().toISOString(),status:'won',poolSize:p.length});
+  session.results.push({prizeId:prize.id,prizeName:prize.name,name,comment:(session.comments||{})[norm(name)]||'',avatar:AVS[norm(name)]||'',time:new Date().toISOString(),status:'won',poolSize:p.length});
   persist();$('#reveal').hidden=true;$('#castBtn').disabled=true;$('#prizeSel').disabled=true;
   cast(name,prize.name);
 }
@@ -554,6 +581,10 @@ $('#nextBtn').onclick=()=>{$('#reveal').hidden=true;anim.phase='idle';renderPriz
 $('#redrawBtn').onclick=()=>{const r=session.results[session.results.length-1];if(!r||r.status!=='won')return;r.status='redrawn';persist();anim.phase='idle';renderPrizeSel();updateMeta();doDraw(r.prizeId)};
 $('#endBtn').onclick=()=>{if(anim.phase!=='idle'&&anim.phase!=='show')return;session.ended=true;persist();renderResults(session,false);show('results')};
 
+$('#rvAv').onclick=()=>$('#avFile').click();
+$('#avFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=160;const sz=Math.min(im.width,im.height);c.getContext('2d').drawImage(im,(im.width-sz)/2,(im.height-sz)/2,sz,sz,0,0,160,160);
+  const d=c.toDataURL('image/jpeg',.85);const lr=session.results[session.results.length-1];if(!lr)return;AVS[norm(lr.name)]=d;saveAvs();lr.avatar=d;persist();paintAv($('#rvAv'),lr.name,d);toast('大頭照已更新')};im.src=r.result};r.readAsDataURL(f)};
+
 /* ---------- results ---------- */
 let viewing=null;
 function renderResults(s,fromHistory){viewing=s;$('#rsTitle').textContent=s.title;
@@ -562,7 +593,8 @@ function renderResults(s,fromHistory){viewing=s;$('#rsTitle').textContent=s.titl
   const tb=$('#rsBody');tb.innerHTML='';
   if(!s.results.length){const tr=document.createElement('tr');tr.innerHTML='<td colspan="4" class="t">這場還沒有抽出任何人</td>';tb.appendChild(tr)}
   s.results.forEach(r=>{const tr=document.createElement('tr');if(r.status!=='won')tr.className='redrawn';
-    [['',r.prizeName],['n',r.name],['t',hms(r.time)]].forEach(([c,v])=>{const td=document.createElement('td');td.className=c;td.textContent=v;tr.appendChild(td)});
+    [['',r.prizeName],['n',r.name],['t',hms(r.time)]].forEach(([c,v])=>{const td=document.createElement('td');td.className=c;
+      if(c==='n'){const w=document.createElement('div');w.className='ncell';const a=document.createElement('span');a.className='av sm';paintAv(a,v,r.avatar);const t=document.createElement('div');t.textContent=v;if(r.comment){const sm=document.createElement('small');sm.textContent='「'+r.comment+'」';t.appendChild(sm)}w.append(a,t);td.appendChild(w)}else td.textContent=v;tr.appendChild(td)});
     const td=document.createElement('td');td.className='s';td.innerHTML=r.status==='won'?'<span class="tag win">得獎</span>':'<span class="tag">重抽</span>';tr.appendChild(td);tb.appendChild(tr)});
   $('#backDraw').hidden=fromHistory;$('#againBtn').hidden=fromHistory;$('#saveBtn').hidden=fromHistory;}
 $('#saveBtn').onclick=()=>{session.saved=true;session.ended=true;persist();toast(db?'已存到紀錄（換裝置也看得到）':'已存到這台裝置的紀錄')};
@@ -580,10 +612,12 @@ async function offer(filename,data,fallback){
 }
 $('#posterBtn').onclick=()=>{const s=viewing,P=$('#poster');P.innerHTML='';const add=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;e.textContent=txt;P.appendChild(e);return e};
   add('h3','','今日漁獲');add('div','pt',s.title);const won=s.results.filter(r=>r.status==='won');add('div','pm',s.date+'・參加 '+s.participants.length+' 人・得獎 '+won.length+' 位');
-  const order=[];const g={};won.forEach(r=>{if(!g[r.prizeName]){g[r.prizeName]=[];order.push(r.prizeName)}g[r.prizeName].push(r.name)});
-  order.forEach(k=>{const d=document.createElement('div');d.className='pgroup';const a=document.createElement('div');a.className='pp';a.textContent=k+'（'+g[k].length+'）';d.appendChild(a);g[k].forEach(n=>{const e=document.createElement('div');e.className='pn';e.textContent=n;d.appendChild(e)});P.appendChild(d)});
+  const order=[];const g={};won.forEach(r=>{if(!g[r.prizeName]){g[r.prizeName]=[];order.push(r.prizeName)}g[r.prizeName].push(r)});
+  order.forEach(k=>{const d=document.createElement('div');d.className='pgroup';const a=document.createElement('div');a.className='pp';a.textContent=k+'（'+g[k].length+'）';d.appendChild(a);
+    g[k].forEach(r=>{const row=document.createElement('div');row.className='prow';const av=document.createElement('span');av.className='av md';paintAv(av,r.name,r.avatar);const t=document.createElement('div');t.style.minWidth='0';const e=document.createElement('div');e.className='pn';e.textContent=r.name;t.appendChild(e);
+      if(r.comment){const c=document.createElement('div');c.className='pcm';c.textContent='「'+r.comment+'」';t.appendChild(c)}row.append(av,t);d.appendChild(row)});P.appendChild(d)});
   if(!won.length)add('div','pm','這場還沒有得獎者');add('div','hint','點一下畫面關閉');P.hidden=false;P.onclick=()=>P.hidden=true};
-$('#pngBtn').onclick=()=>{const s=viewing;const c=resultImage(s);c.toBlob(blob=>{offer(s.date+'_'+s.title+'_抽獎結果.png',blob,()=>{
+$('#pngBtn').onclick=async()=>{const s=viewing;await Promise.all(s.results.filter(r=>r.avatar&&!r._img).map(r=>new Promise(res=>{const im=new Image();im.onload=()=>{Object.defineProperty(r,'_img',{value:im,enumerable:false,configurable:true});res()};im.onerror=res;im.src=r.avatar})));const c=resultImage(s);c.toBlob(blob=>{offer(s.date+'_'+s.title+'_抽獎結果.png',blob,()=>{
   const im=new Image();im.src=c.toDataURL('image/png');const w=document.createElement('div');const p=document.createElement('p');p.className='note';p.textContent='長按圖片即可儲存到相簿。';w.append(im,p);sheet('抽獎結果圖',w)})},'image/png')};
 
 function resultImage(s){
@@ -595,7 +629,7 @@ function resultImage(s){
   x.fillStyle='#ffffff';x.font='900 52px "Noto Sans TC",sans-serif';x.fillText(clip(x,s.title,W-144),72,210);
   x.fillStyle='#a9c3dc';x.font='500 34px "Noto Sans TC",sans-serif';x.fillText(s.date+'・參加 '+s.participants.length+' 人・得獎 '+rows.length+' 位',72,268);
   rows.forEach((r,i)=>{const y=top+i*rowH;x.fillStyle=i%2?'rgba(255,255,255,.08)':'rgba(255,255,255,.14)';rr(x,56,y,W-112,rowH-12,22);x.fill();
-    x.fillStyle='#ff4b3e';x.beginPath();x.arc(104,y+42,18,0,7);x.fill();
+    x.save();x.beginPath();x.arc(104,y+42,30,0,7);x.closePath();if(r._img){x.clip();x.drawImage(r._img,74,y+12,60,60)}else{x.fillStyle=avColor(r.name);x.fill();x.fillStyle='#fff';x.font='900 30px "Noto Sans TC",sans-serif';x.textAlign='center';x.fillText((String(r.name).replace(/^[@._]+/,'')[0]||'?').toUpperCase(),104,y+53);x.textAlign='left'}x.restore();
     x.fillStyle='#ffc93c';x.font='700 32px "Noto Sans TC",sans-serif';x.fillText(clip(x,r.prizeName,360),140,y+54);
     x.fillStyle='#ffffff';x.font='800 40px "Baloo 2","Noto Sans TC",sans-serif';x.fillText(clip(x,r.name,W-112-560),520,y+56)});
   if(!rows.length){x.fillStyle='#fff';x.font='700 36px "Noto Sans TC",sans-serif';x.fillText('這場還沒有得獎者',72,top+60)}
@@ -693,7 +727,7 @@ function drawParticles(){
   [anim.splash,anim.parts].forEach(arr=>{for(let i=arr.length-1;i>=0;i--){const p=arr[i];p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0){arr.splice(i,1);continue}
     ctx.save();ctx.globalAlpha=Math.min(1,p.life/30);ctx.fillStyle=p.c;if(p.rect){ctx.translate(p.x,p.y);ctx.rotate(p.life*.2);ctx.fillRect(-p.r,-p.r/2,p.r*2,p.r)}else{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill()}ctx.restore()}});
 }
-function revealNow(txt){$('#rvPrize').textContent=txt;$('#rvName').textContent=anim.name;$('#reveal').hidden=false;$('#prizeSel').disabled=false;renderPrizeSel();updateMeta();$('#castBtn').disabled=true}
+function revealNow(txt){$('#rvPrize').textContent=txt;$('#rvName').textContent=anim.name;const lr=session.results[session.results.length-1]||{};paintAv($('#rvAv'),anim.name,lr.avatar);$('#rvCm').textContent=lr.comment||'';$('#reveal').hidden=false;$('#prizeSel').disabled=false;renderPrizeSel();updateMeta();$('#castBtn').disabled=true}
 function drawCover(){const sc=Math.max(W/bgImg.width,H/bgImg.height);const iw=bgImg.width*sc,ih=bgImg.height*sc;ctx.drawImage(bgImg,(W-iw)/2,(H-ih)/2,iw,ih)}
 
 /* ---------- garapon (shopping-street lottery drum) ---------- */
