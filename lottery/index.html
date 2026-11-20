@@ -92,9 +92,9 @@ textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
 .adjbtn{border:2px solid #3d6a94;background:transparent;color:var(--foam);border-radius:16px;padding:4px 12px;font-weight:900;font-size:14px;line-height:1.2}
 #castBtn.bonusmode{background:var(--kelp);color:var(--navy)}
 .bonus{position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,#ffe27a,#ff9f1c 55%,#d9480f);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;text-align:center;z-index:5}
-.bonus-img{width:min(70%,52vh);aspect-ratio:1/1;max-width:100%;border-radius:50%;border:8px solid #fff;background:#fff3c4 center/cover no-repeat;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.bonus-img{width:min(70%,45vh);aspect-ratio:1/1;max-width:100%;border-radius:50%;border:8px solid #fff;background:#fff3c4 center/cover no-repeat;box-shadow:0 12px 40px rgba(0,0,0,.3)}
 .bonus-img.none{display:none}
-.bonus-word{font-family:var(--body);font-weight:900;font-size:clamp(48px,17vw,110px);line-height:1;color:#fff;-webkit-text-stroke:10px var(--navy);paint-order:stroke fill;text-shadow:0 8px 0 var(--navy);letter-spacing:.04em}
+.bonus-word{font-family:var(--body);font-weight:900;font-size:clamp(44px,17vmin,110px);line-height:1;color:#fff;-webkit-text-stroke:10px var(--navy);paint-order:stroke fill;text-shadow:0 8px 0 var(--navy);letter-spacing:.04em}
 .bonus.pop .bonus-img{animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
 .bonus.pop .bonus-word{animation:pop .6s .25s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes pop{from{transform:scale(.2) rotate(-12deg);opacity:0}to{transform:none;opacity:1}}
@@ -122,7 +122,7 @@ textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
 .pgroup .pcm{font-size:14px;color:#cfe0f0;font-weight:700}
 td.n .ncell{display:flex;align-items:center;gap:8px}
 td.n small{display:block;font-weight:500;color:var(--muted);font-size:12px}
-.reveal .nm{font-family:var(--display);font-weight:800;font-size:clamp(28px,9vw,52px);line-height:1.05;word-break:break-all;color:var(--navy)}
+.reveal .nm{font-family:var(--display);font-weight:800;font-size:clamp(26px,9vmin,52px);line-height:1.05;word-break:break-all;color:var(--navy)}
 .reveal .row{justify-content:center}
 .reveal .row .btn{flex:1;min-width:120px}
 .bottom{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:10px 12px;display:grid;grid-template-columns:1fr auto;gap:8px}
@@ -153,6 +153,47 @@ tr.redrawn td.s{text-decoration:none}
 .sheet img{width:100%;border-radius:12px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;border:2px solid var(--kelp);padding:10px 16px;border-radius:999px;font-weight:700;z-index:60;max-width:90%;text-align:center}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+/* ===== responsive: phone / tablet / desktop, portrait & landscape ===== */
+#draw{height:100vh;height:100dvh}
+.cols,.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.reveal{max-height:calc(100% - 24px);overflow:auto;box-sizing:border-box}
+@media (min-width:760px){
+  .wrap{max-width:1180px}
+  .cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start}
+  #startBtn,#againBtn{max-width:560px;align-self:center}
+  #results .wrap,#history .wrap{max-width:900px}
+  .bgprev{max-width:420px}
+  .grid2{grid-template-columns:repeat(4,1fr)}
+  .poster{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-content:start;gap:18px}
+  .poster>:not(.pgroup){grid-column:1/-1}
+  .poster>.pgroup{align-self:start}
+}
+@media (min-width:1400px){.wrap{max-width:1320px}}
+/* draw screen landscape: sea on the left, controls on the right */
+@media (orientation:landscape) and (min-width:600px){
+  #draw{display:grid;grid-template-columns:minmax(0,1fr) clamp(240px,30vw,400px);grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"stage top" "stage bottom"}
+  #draw .stage{grid-area:stage;margin:max(8px,env(safe-area-inset-top,0px)) 0 max(8px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+  #draw .top{grid-area:top;overflow:auto;padding-top:max(10px,env(safe-area-inset-top,0px))}
+  #draw .meta{flex-direction:column;align-items:flex-start;gap:4px}
+  #draw .bottom{grid-area:bottom;grid-template-columns:1fr;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+  #draw .endbtn{padding:12px 16px}
+  .reveal{left:auto;right:12px;bottom:12px;width:min(46%,420px)}
+}
+/* short screens (phone held sideways) */
+@media (max-height:520px){
+  #prizeSel{font-size:18px;padding:8px 10px}
+  #draw .meta b{font-size:17px}
+  #castBtn{font-size:22px;padding:12px}
+  .reveal{padding:10px;gap:6px}
+  .reveal .pz{font-size:15px}
+  .reveal .nm{font-size:clamp(22px,7vmin,36px)}
+  .av{width:44px;height:44px;font-size:20px}
+  .cm{font-size:14px}
+  .reveal .row .btn{padding:8px 10px;min-width:0}
+  .reveal .row{flex-direction:column;align-items:stretch}
+  .poster h3{font-size:32px}.poster .pt{font-size:20px}.pgroup .pn{font-size:22px}
+  .sheet .card{max-height:96%}
+}
 </style>
 
 <!-- ============ SETUP ============ -->
@@ -169,6 +210,7 @@ tr.redrawn td.s{text-decoration:none}
       <span class="row"><button class="btn" id="resumeBtn">繼續抽</button><button class="btn ghost" id="resumeResults">看結果</button></span>
     </div>
 
+    <div class="cols"><div class="col">
     <div class="card" data-tour="event">
       <h2>今天的場次</h2>
       <div class="field"><label class="lbl" for="evTitle">場次名稱</label><input id="evTitle" type="text" maxlength="40"></div>
@@ -215,6 +257,7 @@ tr.redrawn td.s{text-decoration:none}
       <div class="chips" id="pChips"></div>
     </div>
 
+    </div><div class="col">
     <div class="card" data-tour="ig">
       <h2>IG 連線 <small>一次設定，之後自動抓留言</small></h2>
       <div class="igstate" id="igState">還沒連線</div>
@@ -268,6 +311,8 @@ tr.redrawn td.s{text-decoration:none}
       </div>
       <label class="toggle"><input type="checkbox" id="showSea">在背景上加海浪</label>
     </div>
+
+    </div></div>
 
     <button class="btn red big" id="startBtn" data-tour="start">開始抽獎</button>
     <p class="note" id="startHint" style="text-align:center;color:#a9c3dc"></p>
@@ -777,6 +822,8 @@ function cast(name,prize){if(session.style==='garapon'){startG(name,prize);retur
   anim.color=COLORS[randInt(COLORS.length)];anim.splash=[];anim.parts=[];tone(700,.35,'sawtooth',.06,180)}
 const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2, clamp=t=>Math.max(0,Math.min(1,t));
 function horizon(){return H*.40}
+const SIDE=matchMedia('(orientation:landscape) and (min-width:600px)');
+function fishX(){return SIDE.matches?W*.28:W*.44}
 function target(){return {x:W*.36,y:horizon()+(H-horizon())*.42}}
 function rodBase(){return {x:W*.98,y:H*1.03}}
 function rodLen(){return Math.min(H*.62,W*.95)}
@@ -798,9 +845,9 @@ function frame(now){requestAnimationFrame(frame);if($('#draw').hidden)return;if(
   // swimming shadows with names
   shadows.forEach(s=>{s.x+=s.v*.016;if(s.x>1.15||s.x<-.15){s.v=-s.v;s.name=shadowNames.length?shadowNames[randInt(shadowNames.length)]:''}
     if(!s.name&&shadowNames.length)s.name=shadowNames[randInt(shadowNames.length)];
-    const x=s.x*W,y=hz+(H-hz)*s.y,w=W*.16*s.s;ctx.save();ctx.translate(x,y);ctx.scale(s.v>0?-1:1,1);ctx.fillStyle='rgba(4,30,60,.35)';
+    const x=s.x*W,y=hz+(H-hz)*s.y,w=Math.min(W,H*.9)*.16*s.s;ctx.save();ctx.translate(x,y);ctx.scale(s.v>0?-1:1,1);ctx.fillStyle='rgba(4,30,60,.35)';
     ctx.beginPath();ctx.ellipse(0,0,w/2,w*.2,0,0,7);ctx.fill();ctx.beginPath();ctx.moveTo(w*.42,0);ctx.lineTo(w*.68,-w*.18);ctx.lineTo(w*.68,w*.18);ctx.fill();ctx.restore();
-    if(s.name){ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='700 '+Math.max(11,W*.03)+'px "Baloo 2","Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.fillText(clipc(s.name,w*1.4),x,y+w*.2+14)}});
+    if(s.name){ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='700 '+Math.max(11,Math.min(W,H*.9)*.03)+'px "Baloo 2","Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.fillText(clipc(s.name,w*1.4),x,y+w*.2+14)}});
   // rod + line + bobber/fish
   const el=now-anim.t0;let a=-.42+Math.sin(t*1.3)*.015,bob=null,fish=null,bang=false;const T=target();
   const A_REST=-.42,A_BACK=.22,A_FWD=-.78,A_WAIT=-.55;
@@ -816,15 +863,15 @@ function frame(now){requestAnimationFrame(frame);if($('#draw').hidden)return;if(
   else if(anim.phase==='bite'){const j=Math.sin(el/40)*.03;a=A_WAIT+j-(el/D.bite)*.08;bob={x:T.x,y:T.y+10+Math.sin(el/35)*6};bang=true;
     if(el>D.bite){anim.phase='reel';anim.t0=now;spawnSplash(T,26);for(let i=0;i<8;i++)tone(300+i*40,.05,'square',.03,0,i*.09)}}
   else if(anim.phase==='reel'){const k=ease(clamp(el/D.reel));a=A_WAIT+(-.08-A_WAIT)*k;
-    const C={x:W*.44,y:H*.42};fish={x:T.x+(C.x-T.x)*k,y:T.y+(C.y-T.y)*k-Math.sin(k*Math.PI)*H*.12,s:.25+.75*k,r:Math.sin(el/60)*.35*(1-k)};
+    const C={x:fishX(),y:H*.42};fish={x:T.x+(C.x-T.x)*k,y:T.y+(C.y-T.y)*k-Math.sin(k*Math.PI)*H*.12,s:.25+.75*k,r:Math.sin(el/60)*.35*(1-k)};
     if(el>=D.reel){anim.phase='show';anim.t0=now;spawnConfetti();[523,659,784,1046].forEach((f,i)=>tone(f,.25,'triangle',.1,0,i*.11));
       revealNow('恭喜釣到「'+anim.prize+'」')}}
-  else if(anim.phase==='show'){a=-.08+Math.sin(t*2)*.02;fish={x:W*.44,y:H*.42+Math.sin(t*2.2)*4,s:1,r:Math.sin(t*2)*.04}}
+  else if(anim.phase==='show'){a=-.08+Math.sin(t*2)*.02;fish={x:fishX(),y:H*.42+Math.sin(t*2.2)*4,s:1,r:Math.sin(t*2)*.04}}
   drawRod(a);const tip=tipOf(a);
-  if(fish){const fw=Math.min(W*.8,H*.9)*fish.s;const mouth={x:fish.x-Math.cos(fish.r)*fw*.5,y:fish.y-Math.sin(fish.r)*fw*.5};line(tip,mouth,.02);drawFish(fish.x,fish.y,fw,anim.color,anim.name,fish.r)}
-  else if(bob){line(tip,bob,anim.phase==='cast'?0:.12);drawBob(bob);if(bang){ctx.fillStyle='#ff4b3e';ctx.font='900 '+Math.max(40,W*.12)+'px "Baloo 2",sans-serif';ctx.textAlign='center';ctx.fillText('!',bob.x,bob.y-30)}}
+  if(fish){const fw=Math.min(SIDE.matches?W*.52:W*.8,H*.9)*fish.s;const mouth={x:fish.x-Math.cos(fish.r)*fw*.5,y:fish.y-Math.sin(fish.r)*fw*.5};line(tip,mouth,.02);drawFish(fish.x,fish.y,fw,anim.color,anim.name,fish.r)}
+  else if(bob){line(tip,bob,anim.phase==='cast'?0:.12);drawBob(bob);if(bang){ctx.fillStyle='#ff4b3e';ctx.font='900 '+Math.max(40,Math.min(W,H*.9)*.12)+'px "Baloo 2",sans-serif';ctx.textAlign='center';ctx.fillText('!',bob.x,bob.y-30)}}
   else{const b={x:tip.x,y:tip.y+40+Math.sin(t*2)*3};line(tip,b,0);drawBob(b);
-    if(anim.phase==='idle'&&!$('#castBtn').disabled){ctx.fillStyle='rgba(255,255,255,.95)';ctx.font='900 '+Math.max(18,W*.055)+'px "Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.fillText('按下「甩竿！」開始抽',W*.42,hz-18)}}
+    if(anim.phase==='idle'&&!$('#castBtn').disabled){ctx.fillStyle='rgba(255,255,255,.95)';ctx.font='900 '+Math.max(18,Math.min(W,H*.9)*.055)+'px "Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.fillText('按下「甩竿！」開始抽',W*.42,hz-18)}}
   drawParticles();
 }
 function drawParticles(){
@@ -885,17 +932,17 @@ function frameG(now,t){const g=gGeom();const el=now-anim.t0;
     if(k>.3){ctx.save();ctx.translate(x,y);ctx.rotate(t*.4);ctx.fillStyle='rgba(255,224,130,'+(.3*k)+')';for(let i=0;i<12;i++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(BR*2.6,-BR*.35);ctx.lineTo(BR*2.6,BR*.35);ctx.fill()}ctx.restore()}
     drawBall(x,y+(anim.phase==='show'?Math.sin(t*2)*4:0),g.br+(BR-g.br)*k,anim.color,k>.5?anim.name:'');
     if(anim.phase==='g_grow'&&el>=DG.grow){anim.phase='show';anim.t0=now;spawnConfetti();[523,659,784,1046].forEach((f,i)=>tone(f,.25,'triangle',.1,0,i*.11));revealNow('恭喜抽中「'+anim.prize+'」')}}
-  else if(anim.phase==='idle'&&!$('#castBtn').disabled&&!$('#castBtn').classList.contains('bonusmode')){ctx.fillStyle='#fff';ctx.font='900 '+Math.max(18,W*.055)+'px "Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.lineWidth=5;ctx.strokeStyle='rgba(45,20,32,.8)';ctx.strokeText('按下「轉！」開始抽',W*.5,H*.2);ctx.fillText('按下「轉！」開始抽',W*.5,H*.2)}
+  else if(anim.phase==='idle'&&!$('#castBtn').disabled&&!$('#castBtn').classList.contains('bonusmode')){ctx.fillStyle='#fff';ctx.font='900 '+Math.max(18,Math.min(W,H*.9)*.055)+'px "Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.lineWidth=5;ctx.strokeStyle='rgba(45,20,32,.8)';ctx.strokeText('按下「轉！」開始抽',W*.5,H*.2);ctx.fillText('按下「轉！」開始抽',W*.5,H*.2)}
 }
 function clipc(t,w){if(ctx.measureText(t).width<=w)return t;while(t.length>1&&ctx.measureText(t+'…').width>w)t=t.slice(0,-1);return t+'…'}
 function spawnSplash(p,n){for(let i=0;i<n;i++)anim.splash.push({x:p.x,y:p.y,vx:(Math.random()-.5)*6,vy:-Math.random()*7-2,g:.35,r:2+Math.random()*4,c:'rgba(235,250,255,.95)',life:40+Math.random()*20})}
 function spawnConfetti(){if(reduce)return;const cs=['#ffc93c','#ff4b3e','#4cc9f0','#7bd389','#ffffff','#ff4f81'];for(let i=0;i<140;i++)anim.parts.push({x:W*Math.random(),y:-20-Math.random()*H*.4,vx:(Math.random()-.5)*2,vy:Math.random()*2+1,g:.05,r:4+Math.random()*4,c:cs[i%cs.length],rect:true,life:160+Math.random()*80})}
 function drawRod(a){const b=rodBase(),tip=tipOf(a);const n={x:-(tip.y-b.y),y:tip.x-b.x};const len=Math.hypot(n.x,n.y);n.x/=len;n.y/=len;
-  const w0=Math.max(7,W*.022),w1=1.5;ctx.fillStyle='#3a2a1f';ctx.beginPath();ctx.moveTo(b.x+n.x*w0,b.y+n.y*w0);ctx.lineTo(tip.x+n.x*w1,tip.y+n.y*w1);ctx.lineTo(tip.x-n.x*w1,tip.y-n.y*w1);ctx.lineTo(b.x-n.x*w0,b.y-n.y*w0);ctx.fill();
+  const w0=Math.max(7,Math.min(W,H*.9)*.022),w1=1.5;ctx.fillStyle='#3a2a1f';ctx.beginPath();ctx.moveTo(b.x+n.x*w0,b.y+n.y*w0);ctx.lineTo(tip.x+n.x*w1,tip.y+n.y*w1);ctx.lineTo(tip.x-n.x*w1,tip.y-n.y*w1);ctx.lineTo(b.x-n.x*w0,b.y-n.y*w0);ctx.fill();
   const g={x:b.x+(tip.x-b.x)*.14,y:b.y+(tip.y-b.y)*.14};ctx.fillStyle='#c9d6e2';ctx.beginPath();ctx.arc(g.x-n.x*w0*2.2,g.y-n.y*w0*2.2,w0*1.8,0,7);ctx.fill();ctx.fillStyle='#ff4b3e';ctx.beginPath();ctx.arc(g.x-n.x*w0*2.2,g.y-n.y*w0*2.2,w0*.7,0,7);ctx.fill();
   ctx.fillStyle='#ffc93c';for(let k=.3;k<.95;k+=.18){const p={x:b.x+(tip.x-b.x)*k,y:b.y+(tip.y-b.y)*k};ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,7);ctx.fill()}}
 function line(p,q,sag){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(p.x,p.y);const mx=(p.x+q.x)/2,my=(p.y+q.y)/2+Math.hypot(q.x-p.x,q.y-p.y)*sag;ctx.quadraticCurveTo(mx,my,q.x,q.y);ctx.stroke()}
-function drawBob(b){const r=Math.max(8,W*.022);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(b.x,b.y,r,0,Math.PI);ctx.fill();ctx.fillStyle='#ff4b3e';ctx.beginPath();ctx.arc(b.x,b.y,r,Math.PI,0);ctx.fill();ctx.fillStyle='#222';ctx.fillRect(b.x-1,b.y-r-8,2,8)}
+function drawBob(b){const r=Math.max(8,Math.min(W,H*.9)*.022);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(b.x,b.y,r,0,Math.PI);ctx.fill();ctx.fillStyle='#ff4b3e';ctx.beginPath();ctx.arc(b.x,b.y,r,Math.PI,0);ctx.fill();ctx.fillStyle='#222';ctx.fillRect(b.x-1,b.y-r-8,2,8)}
 function drawFish(x,y,fw,col,name,rot){const fh=fw*.42;ctx.save();ctx.translate(x,y);ctx.rotate(rot);
   ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(fw*.38,0);ctx.lineTo(fw*.62,-fh*.55);ctx.quadraticCurveTo(fw*.54,0,fw*.62,fh*.55);ctx.closePath();ctx.fill();
   ctx.beginPath();ctx.moveTo(-fw*.1,-fh*.45);ctx.quadraticCurveTo(fw*.08,-fh*.85,fw*.25,-fh*.4);ctx.fill();
