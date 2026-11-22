@@ -1,7 +1,7 @@
 /**
- * 每日國際新聞（給媽媽） v6  2026-11-22（多層備案＋全世界新聞翻中文）（預設不用搜尋、模型名更新）
- * 每天早上 7 點多：抓 Google 新聞（台灣中文版）→ 去掉舊的、重複的 → Gemini 挑 5 則寫摘要和一句話總結
- * → 用大字卡片推到 LINE 官方帳號（所有加好友的人都會收到）。
+ * 每日國際新聞（給媽媽） v7  2026-11-22
+ * 每天早上：第一張是當地天氣＋穿衣建議，接著是全世界的新聞（中英日 Google 新聞 → 去重 → Gemini 挑選、翻成中文摘要）
+ * → 用大字卡片推到 LINE 官方帳號。每個人傳一次「位置資訊」就會用那裡的天氣。
  *
  * 指令碼屬性（專案設定 → 指令碼屬性）：
  *   LINE_TOKEN  = LINE 官方帳號的 Channel access token（長期）
@@ -35,6 +35,9 @@ const CFG = {
     ['財經', 'https://tw.news.yahoo.com/rss/finance'],
   ],
   GEMINI_BUDGET_SEC: 200,   // 超過這個秒數就不再呼叫下一個模型（GAS 一次最多跑 6 分鐘）
+  // 第一則固定是天氣＋穿衣建議（Open-Meteo，免費不用金鑰）。
+  // 每個人在 LINE 傳一次「位置資訊」，之後就用那裡的天氣；還沒傳過的人用這個預設地點
+  WEATHER: { name: '台北市北投區', lat: 25.1316, lon: 121.5017 },
   TZ: 'Asia/Taipei',
 };
 
@@ -71,17 +74,24 @@ function dailyNews(force) {
   if (!r || !r.items || !r.items.length) {
     try { r = test ? build() : titlesOnly(); } catch (e) { console.error(e); r = { items: [] }; }   // 排程時沒準備好：只推標題，不等 Gemini
   }
-  let msgs;
-  if (r.items.length) msgs = cards(r.items);
-  else {   // 連新聞都抓不到：至少推一則早安＋新聞網址
-    msgs = [{ type: 'text', text: '☀️ 早安！今天的新聞整理暫時出不來，可以點這裡看最新國際新聞：\nhttps://news.google.com/home?hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }];
-    alertMail('今天抓不到新聞（Google 新聞和備用來源都失敗），已改推早安訊息。');
-  }
-  const code = pushAll(msgs);
-  if (code < 300) {
+  // 每個人用自己的天氣地點分開推；還沒有人登記過（沒傳過訊息）就用預設地點群發
+  const users = jget('USERS', {}), uids = Object.keys(users), wxCache = {};
+  const msgsFor = loc => {
+    const k = loc.lat.toFixed(2) + ',' + loc.lon.toFixed(2);
+    if (!(k in wxCache)) wxCache[k] = weatherBubble(loc);
+    const wx = wxCache[k];
+    if (r.items.length) return cards(r.items, wx);
+    return (wx ? [{ type: 'flex', altText: '今日天氣', contents: wx }] : []).concat([{ type: 'text', text: '☀️ 早安！今天的新聞整理暫時出不來，可以點這裡看最新國際新聞：\nhttps://news.google.com/home?hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }]);
+  };
+  if (!r.items.length) alertMail('今天抓不到新聞（Google 新聞和備用來源都失敗），已改推早安訊息。');
+  let ok = 0, code = 0;
+  if (!uids.length) { code = pushAll(msgsFor(CFG.WEATHER)); if (code < 300) ok = 1; }
+  else uids.forEach(u => { const c = lineApi('message/push', { to: u, messages: msgsFor(users[u]) }); if (c < 300) ok++; else code = c; });
+  if (ok) {
     setProp('LAST_SENT', today);
     if (r.items.length) remember(r.items);
-    console.log('✅ 已推播 ' + r.items.length + ' 則（' + r.mode + '）');
+    console.log('✅ 已推播 ' + r.items.length + ' 則給 ' + (uids.length ? ok + '/' + uids.length + ' 人' : '所有好友') + '（' + r.mode + '）');
+    if (uids.length && ok < uids.length) alertMail('有 ' + (uids.length - ok) + ' 個人推播失敗（HTTP ' + code + '），請看執行記錄。');
   } else alertMail('LINE 推播失敗（HTTP ' + code + '）。' + (new Date().getHours() < CFG.HOUR + 1 ? CFG.HOUR + 1 + ' 點會再試一次。' : '今天已經沒有備援了，請看執行記錄。') + '\n常見原因：LINE_TOKEN 錯誤、本月免費則數用完。');
 }
 function titlesOnly() {
@@ -228,7 +238,7 @@ function parseJson(t) {
 }
 
 // ===== 4. 大字卡片 =====
-function cards(items) {
+function cards(items, wx) {
   const d = new Date(), wk = '日一二三四五六'[Number(Utilities.formatDate(d, CFG.TZ, 'u')) % 7];
   const head = Utilities.formatDate(d, CFG.TZ, 'M/d') + '（' + wk + '）今日國際新聞';
   const bubbles = items.map((it, i) => {
@@ -246,11 +256,53 @@ function cards(items) {
   });
   return [
     { type: 'text', text: '☀️ 早安！' + head + '\n共 ' + items.length + ' 則，往左滑看下一則。' },
-    { type: 'flex', altText: head + '：' + items.map(x => x.title).join('、').slice(0, 300), contents: { type: 'carousel', contents: bubbles } },
+    { type: 'flex', altText: head + '：' + items.map(x => x.title).join('、').slice(0, 300), contents: { type: 'carousel', contents: (wx ? [wx] : []).concat(bubbles).slice(0, 12) } },
   ];
 }
 
 // ===== 5. LINE 推播（broadcast：所有加好友的人都收到）=====
+function lineApi(path, body) {
+  const r = UrlFetchApp.fetch('https://api.line.me/v2/bot/' + path, {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + prop('LINE_TOKEN') }, payload: JSON.stringify(body) });
+  if (r.getResponseCode() >= 300) console.error('LINE ' + path + ' ' + r.getResponseCode() + ' ' + r.getContentText());
+  return r.getResponseCode();
+}
+
+// ===== 接收 LINE 訊息（要部署成網頁應用程式，並把網址填到 LINE 的 Webhook）=====
+// 傳「位置資訊」→ 換天氣地點；傳其他任何訊息或加好友 → 登記成推播對象＋回說明
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents), users = jget('USERS', {});
+    (body.events || []).forEach(ev => {
+      const u = ev.source && ev.source.userId;
+      if (!u) return;
+      if (ev.type === 'unfollow') { delete users[u]; return; }
+      const isNew = !users[u];
+      if (isNew) users[u] = Object.assign({}, CFG.WEATHER);
+      let text = null;
+      if (ev.type === 'message' && ev.message.type === 'location') {
+        users[u] = { name: placeName(ev.message.address, ev.message.title), lat: ev.message.latitude, lon: ev.message.longitude };
+        text = '📍 天氣地點已改成：' + users[u].name + '\n明天早上開始用這裡的天氣。換地方的時候，再傳一次位置就好。';
+      } else if (ev.type === 'follow' || ev.type === 'message') {
+        text = (isNew ? '✅ 已登記，每天早上 7 點會收到天氣和國際新聞。\n' : '') +
+          '目前的天氣地點：' + users[u].name + '\n\n想換地點：按左下「＋」→「位置資訊」→ 傳送目前位置。';
+      }
+      if (text && ev.replyToken) lineApi('message/reply', { replyToken: ev.replyToken, messages: [{ type: 'text', text }] });
+    });
+    jset('USERS', users);
+  } catch (err) { console.error('doPost ' + err); }
+  return ContentService.createTextOutput('OK');
+}
+function placeName(addr, title) {
+  const a = String(addr || '');
+  const tw = a.match(/([^\s\d]{2}[市縣])([^\s\d]{1,3}?[區鄉鎮市])/);
+  if (tw) return tw[1] + tw[2];
+  const jp = a.match(/([^\s、\d〒-]{2,3}[都道府県])([^\s\d]{1,6}?[市区町村])/);
+  if (jp) return jp[1] + jp[2];
+  return (title || a || '目前位置').slice(0, 15);
+}
+
 function pushAll(messages) {
   const r = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/broadcast', {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
@@ -266,3 +318,44 @@ function setProp(k, v) { P().setProperty(k, v); }
 function jget(k, d) { try { return JSON.parse(prop(k)) || d; } catch (e) { return d; } }
 function jset(k, v) { setProp(k, JSON.stringify(v)); }
 function fmt(t, f) { return Utilities.formatDate(new Date(t), CFG.TZ, f); }
+
+// ===== 天氣＋穿衣建議（規則判斷，不用 AI，一定穩） =====
+const WMO = { 0: '晴天', 1: '晴時多雲', 2: '多雲', 3: '陰天', 45: '有霧', 48: '有霧', 51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨',
+  61: '小雨', 63: '中雨', 65: '大雨', 66: '凍雨', 67: '凍雨', 71: '小雪', 73: '中雪', 75: '大雪', 80: '陣雨', 81: '陣雨', 82: '大陣雨',
+  95: '雷雨', 96: '雷雨', 99: '強烈雷雨' };
+function weather(w) {
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + w.lat + '&longitude=' + w.lon +
+    '&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_min,precipitation_probability_max,uv_index_max' +
+    '&timezone=' + encodeURIComponent(CFG.TZ) + '&forecast_days=1';
+  try {
+    const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) { console.warn('天氣 HTTP ' + r.getResponseCode()); return null; }
+    const d = JSON.parse(r.getContentText()).daily, g = k => (d[k] || [])[0];
+    return { code: g('weather_code'), max: Math.round(g('temperature_2m_max')), min: Math.round(g('temperature_2m_min')),
+      feel: Math.round(g('apparent_temperature_min')), rain: g('precipitation_probability_max') || 0, uv: Math.round(g('uv_index_max') || 0) };
+  } catch (e) { console.warn('天氣 ' + e); return null; }
+}
+function clothing(w) {
+  const t = w.max, tips = [];
+  tips.push(t >= 30 ? '短袖、透氣衣服' : t >= 26 ? '短袖或薄長袖' : t >= 21 ? '長袖上衣，帶件薄外套' : t >= 16 ? '長袖＋外套或毛衣' : t >= 11 ? '厚外套、毛衣' : '羽絨衣、圍巾、手套');
+  if (w.max - w.min >= 8 || w.feel <= w.min - 3) tips.push('早晚比較涼，出門多帶一件');
+  if (w.rain >= 50) tips.push('會下雨，記得帶傘'); else if (w.rain >= 30) tips.push('可能下雨，帶把折傘');
+  if (w.uv >= 8) tips.push('紫外線很強，戴帽子、擦防曬'); else if (w.uv >= 6) tips.push('太陽大，注意防曬');
+  return tips;
+}
+function weatherBubble(loc) {
+  loc = loc || CFG.WEATHER;
+  const w = weather(loc);
+  if (!w) return null;
+  const desc = WMO[w.code] || '';
+  const row = (k, v) => ({ type: 'box', layout: 'horizontal', margin: 'md', contents: [
+    { type: 'text', text: k, size: 'xl', color: '#666666', flex: 3 }, { type: 'text', text: v, size: 'xl', weight: 'bold', color: '#111111', flex: 5, wrap: true }] });
+  return { type: 'bubble', size: 'giga', body: { type: 'box', layout: 'vertical', paddingAll: '20px', contents: [
+    { type: 'text', text: '今日天氣・' + loc.name, size: 'md', color: '#666666' },
+    { type: 'text', text: (desc || '天氣') + '　' + w.min + '～' + w.max + '°C', size: 'xxl', weight: 'bold', wrap: true, color: '#111111', margin: 'md' },
+    row('降雨機率', w.rain + '%'), row('體感最低', w.feel + '°C'), row('紫外線', String(w.uv)),
+    { type: 'box', layout: 'vertical', margin: 'lg', paddingAll: '12px', backgroundColor: '#E8F3FF', cornerRadius: '8px',
+      contents: [{ type: 'text', text: '👕 建議穿著', size: 'xl', weight: 'bold', color: '#0B3D91' }]
+        .concat(clothing(w).map(x => ({ type: 'text', text: '・' + x, size: 'xl', wrap: true, color: '#0B3D91', margin: 'sm' }))) },
+  ] } };
+}
