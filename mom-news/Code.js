@@ -13,7 +13,7 @@
  */
 
 const CFG = {
-  COUNT: 5,                 // 每天幾則
+  COUNT: 10,                // 每天幾則
   SUMMARY_CHARS: 80,        // 每則摘要大約幾個字
   MAX_AGE_HOURS: 30,        // 只收多久以內的新聞
   REMEMBER_DAYS: 4,         // 推過的新聞記住幾天（這幾天內不會再推同一件事）
@@ -159,7 +159,7 @@ function remember(items) {
 function build() {
   const start = Date.now();
   const all = fetchAll();
-  const cands = mix(dedupe(all), 30);
+  const cands = mix(dedupe(all), 40);
   console.log('抓到新聞 ' + all.length + ' 則，去重後 ' + cands.length + ' 則');
   if (!cands.length) return { items: [], candidates: 0, mode: '無' };
   const pastEvents = jget('SEEN', []).map(x => x.t).slice(-40);
@@ -169,7 +169,7 @@ function build() {
     '你是幫長輩整理每日新聞的編輯。以下是過去一天的新聞標題，來自台灣、美國、日本的媒體（有中文、英文、日文）。\n' +
     '請挑出最重要的 ' + CFG.COUNT + ' 則，規則：\n' +
     '- 以國際大事為主：各國重大事件、美國政府動向、戰爭與外交、國際經濟。\n' +
-    '- 要有 1 則股市或金融市場（美股、台股、匯率、利率擇一），但不要超過 2 則。\n' +
+    '- 至少要有 1 則股市或金融市場（美股、台股、匯率、利率）。\n' +
     '- 台灣國內新聞最多 1 則，而且必須是全國性的重大事件。\n' +
     '- 不要娛樂、八卦、社會案件、廣告、天氣小事。\n' +
     '- 優先選全世界都在關注的大事，不要只選台灣媒體的角度。同一件事有中文報導就用中文那則的編號。\n' +
