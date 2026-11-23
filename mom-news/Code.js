@@ -84,7 +84,7 @@ function prepare() {
 }
 function previewTw() { const r = build(true); console.log(JSON.stringify(r.items, null, 2)); console.log('候選 ' + r.candidates + ' 則，摘要方式：' + r.mode); }
 function preview() { const r = build(); console.log(JSON.stringify(r.items, null, 2)); console.log('候選 ' + r.candidates + ' 則，摘要方式：' + r.mode); }
-function testSend() { dailyNews(true); }
+function testSend() { dailyNews(true); }   // 補發：今天已經推過也會再推一次，開頭會標「這是補發的」
 
 // ===== 新功能上線公告：群發給所有好友（只發一次；想再發一次就跑 announce）=====
 const ANNOUNCE_TEXT = '📍 新功能：天氣跟著你走\n\n' +
@@ -118,7 +118,7 @@ function dailyNews(force) {
     const k = Number(loc.lat).toFixed(2) + ',' + Number(loc.lon).toFixed(2);
     if (!(k in wxCache)) wxCache[k] = weatherBubble(loc);
     const wx = wxCache[k];
-    if (r.items.length) return cards(r.items, wx, rt.items);
+    if (r.items.length) return cards(r.items, wx, rt.items, test);
     return (wx ? [{ type: 'flex', altText: '今日天氣', contents: wx }] : []).concat([{ type: 'text', text: '☀️ 早安！今天的新聞整理暫時出不來，可以點這裡看最新國際新聞：\nhttps://news.google.com/home?hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }]);
   };
   if (!r.items.length) alertMail('今天抓不到新聞（Google 新聞和備用來源都失敗），已改推早安訊息。');
@@ -315,13 +315,13 @@ function newsBubbles(items, label, color) {
     return b;
   });
 }
-function cards(items, wx, twItems) {
+function cards(items, wx, twItems, resend) {
   const d = new Date(), wk = '日一二三四五六'[Number(Utilities.formatDate(d, CFG.TZ, 'u')) % 7];
   const day = Utilities.formatDate(d, CFG.TZ, 'M/d') + '（' + wk + '）';
   const tw = twItems || [];
   // 第一組：天氣＋台灣民生・經濟；第二組：國際新聞
   const out = [
-    { type: 'text', text: '☀️ 早安！' + day + '\n第一張是今天的天氣' + (tw.length ? '，接著是 ' + tw.length + ' 則台灣民生・經濟新聞' : '') + '；下一組是 ' + items.length + ' 則國際新聞。往左滑看下一則。' },
+    { type: 'text', text: (resend ? '🔁 這是補發的今日新聞（稍早那則有缺漏，請看這一則）\n\n' : '') + '☀️ 早安！' + day + '\n第一張是今天的天氣' + (tw.length ? '，接著是 ' + tw.length + ' 則台灣民生・經濟新聞' : '') + '；下一組是 ' + items.length + ' 則國際新聞。往左滑看下一則。' },
     { type: 'flex', altText: day + '天氣' + (tw.length ? '＋台灣民生・經濟：' + tw.map(x => x.title).join('、').slice(0, 300) : ''),
       contents: { type: 'carousel', contents: (wx ? [wx] : []).concat(newsBubbles(tw, '🇹🇼 台灣', '#1B7F3B')).slice(0, 12) } },
   ];
