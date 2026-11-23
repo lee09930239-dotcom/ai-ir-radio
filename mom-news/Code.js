@@ -298,13 +298,15 @@ function cards(items, wx, twItems) {
   const d = new Date(), wk = '日一二三四五六'[Number(Utilities.formatDate(d, CFG.TZ, 'u')) % 7];
   const day = Utilities.formatDate(d, CFG.TZ, 'M/d') + '（' + wk + '）';
   const tw = twItems || [];
+  // 第一組：天氣＋台灣民生・經濟；第二組：國際新聞
   const out = [
-    { type: 'text', text: '☀️ 早安！' + day + '\n第一張是今天的天氣，接著是 ' + items.length + ' 則國際新聞' + (tw.length ? '，最後是 ' + tw.length + ' 則台灣民生・經濟新聞' : '') + '。往左滑看下一則。' },
-    { type: 'flex', altText: day + '天氣＋國際新聞：' + items.map(x => x.title).join('、').slice(0, 300),
-      contents: { type: 'carousel', contents: (wx ? [wx] : []).concat(newsBubbles(items, '🌏 國際', '#0B3D91')).slice(0, 12) } },
+    { type: 'text', text: '☀️ 早安！' + day + '\n第一張是今天的天氣' + (tw.length ? '，接著是 ' + tw.length + ' 則台灣民生・經濟新聞' : '') + '；下一組是 ' + items.length + ' 則國際新聞。往左滑看下一則。' },
+    { type: 'flex', altText: day + '天氣' + (tw.length ? '＋台灣民生・經濟：' + tw.map(x => x.title).join('、').slice(0, 300) : ''),
+      contents: { type: 'carousel', contents: (wx ? [wx] : []).concat(newsBubbles(tw, '🇹🇼 台灣', '#1B7F3B')).slice(0, 12) } },
   ];
-  if (tw.length) out.push({ type: 'flex', altText: day + '台灣民生・經濟：' + tw.map(x => x.title).join('、').slice(0, 300),
-    contents: { type: 'carousel', contents: newsBubbles(tw, '🇹🇼 台灣', '#1B7F3B').slice(0, 12) } });
+  if (!out[1].contents.contents.length) out.pop();   // 天氣和台灣都沒有：不送空輪播
+  if (items.length) out.push({ type: 'flex', altText: day + '國際新聞：' + items.map(x => x.title).join('、').slice(0, 300),
+    contents: { type: 'carousel', contents: newsBubbles(items, '🌏 國際', '#0B3D91').slice(0, 12) } });
   return out;
 }
 
