@@ -69,11 +69,14 @@ function prepare() {
   if (prop('LAST_SENT') === today) return;
   try { prefetchWeather(); } catch (e) { console.warn('prefetch ' + e); }
   const good = k => prop(k + '_DATE') === today && jget(k, { items: [] }).items.some(x => x.summary);
+  // 國際做完如果還剩時間（例如 Gemini 很快回），同一次接著做台灣
+  const t0 = Date.now();
   try {
     if (!good('PREP')) {
       const r = build();
       if (r.items.length) { jset('PREP', r); setProp('PREP_DATE', today); console.log('✅ 國際已準備 ' + r.items.length + ' 則（' + r.mode + '）'); }
-    } else if (!good('PREP_TW')) {
+    }
+    if (good('PREP') && !good('PREP_TW') && Date.now() - t0 < 120e3) {
       const r = build(true, jget('PREP', { items: [] }).items.map(x => x.event || x.title));
       if (r.items.length) { jset('PREP_TW', r); setProp('PREP_TW_DATE', today); console.log('✅ 台灣已準備 ' + r.items.length + ' 則（' + r.mode + '）'); }
     }
@@ -251,7 +254,11 @@ function build(tw, exclude) {
   for (const useSearch of (CFG.USE_SEARCH ? [true, false] : [false])) {
     for (const m of CFG.MODELS) {
       if ((Date.now() - start) / 1000 > CFG.GEMINI_BUDGET_SEC) { console.warn('時間快不夠了，不再換模型'); break; }
-      text = gemini(m, prompt + (useSearch ? '\n\n可以用 Google 搜尋確認新聞內容後再寫摘要。' : '\n\n重要：摘要只能用上面標題和相關報導裡「明寫」的事實，不可以自己補地名、數字、原因或細節；資訊不夠就只寫一兩句。標題看不懂在講什麼的新聞不要選。'), useSearch);
+      for (let k = 0; k < 2 && !(text && parseJson(text)); k++) {
+        if (k && LAST_GEMINI_CODE !== 503 && LAST_GEMINI_CODE !== 500) break;   // 只有「伺服器忙」才值得等一下再試
+        if (k) { console.log(m + ' 伺服器忙，15 秒後再試一次'); Utilities.sleep(15000); }
+        text = gemini(m, prompt + (useSearch ? '\n\n可以用 Google 搜尋確認新聞內容後再寫摘要。' : '\n\n重要：摘要只能用上面標題和相關報導裡「明寫」的事實，不可以自己補地名、數字、原因或細節；資訊不夠就只寫一兩句。標題看不懂在講什麼的新聞不要選。'), useSearch);
+      }
       if (text && parseJson(text)) { mode = m + (useSearch ? '＋搜尋' : '＋僅標題'); break; }
       text = null;
       Utilities.sleep(3000);   // 太快重試容易被擋 429
@@ -265,7 +272,9 @@ function build(tw, exclude) {
     .map(p => Object.assign({}, p, { orig: cands[p.no].title, src: cands[p.no].src, time: cands[p.no].time, link: cands[p.no].link }));
   return { items: picked, candidates: cands.length, mode };
 }
+let LAST_GEMINI_CODE = 0;
 function gemini(model, prompt, useSearch, plain) {
+  LAST_GEMINI_CODE = 0;
   // 先叫它「少想一點」（回應快很多）；這個模型不支援這個設定 (400) 就改用一般方式再問一次
   const gc = plain ? { temperature: 0.3 } : { temperature: 0.3, thinkingConfig: { thinkingLevel: 'low' } };
   const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: gc };
@@ -276,6 +285,7 @@ function gemini(model, prompt, useSearch, plain) {
     const r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true,
       headers: { 'x-goog-api-key': prop('GEMINI_KEY') }, payload: JSON.stringify(body) });
+    LAST_GEMINI_CODE = r.getResponseCode();
     if (r.getResponseCode() === 400 && !plain) { console.log(model + ' 不支援少想模式，改一般模式'); return gemini(model, prompt, useSearch, true); }
     if (r.getResponseCode() !== 200) { console.warn('Gemini ' + model + (useSearch ? ' 搜尋' : '') + ' HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 300)); return null; }
     console.log(model + ' 回應 ' + Math.round((Date.now() - t0) / 1000) + ' 秒');
