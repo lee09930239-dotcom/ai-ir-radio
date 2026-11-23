@@ -6,6 +6,7 @@
  * 指令碼屬性（專案設定 → 指令碼屬性）：
  *   LINE_TOKEN  = LINE 官方帳號的 Channel access token（長期）
  *   GEMINI_KEY  = Google AI Studio 的 API 金鑰
+ *   HOOK_KEY    = （建議）webhook 密碼；設了之後 LINE 後台 Webhook URL 要改成「…/exec?k=這組密碼」
  *
  * 第一次：選 setup 按「執行」（會建立每天 7 點的排程）。
  * 測試：  選 preview 執行 → 只在執行記錄裡看結果，不推播。
@@ -332,6 +333,8 @@ function lineApi(path, body) {
 // ===== 接收 LINE 訊息（要部署成網頁應用程式，並把網址填到 LINE 的 Webhook）=====
 // 傳「位置資訊」→ 換天氣地點；傳其他任何訊息或加好友 → 登記成推播對象＋回說明
 function doPost(e) {
+  // 🔐 GAS 讀不到 LINE 的簽章，用網址上的 ?k= 確認是 LINE 送來的（HOOK_KEY 沒設＝不檢查）
+  if (prop('HOOK_KEY') && String((e && e.parameter && e.parameter.k) || '') !== prop('HOOK_KEY')) return ContentService.createTextOutput('OK');
   try {
     const body = JSON.parse(e.postData.contents), users = jget('USERS', {});
     (body.events || []).forEach(ev => {
