@@ -66,6 +66,7 @@ function todayStr() { return Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-d
 function prepare() {
   const today = todayStr();
   if (prop('LAST_SENT') === today) return;
+  try { prefetchWeather(); } catch (e) { console.warn('prefetch ' + e); }
   const good = k => prop(k + '_DATE') === today && jget(k, { items: [] }).items.some(x => x.summary);
   try {
     if (!good('PREP')) {
@@ -110,7 +111,7 @@ function dailyNews(force) {
   // 每個人用自己的天氣地點分開推；還沒有人登記過（沒傳過訊息）就用預設地點群發
   const users = jget('USERS', {}), uids = Object.keys(users), wxCache = {};
   const msgsFor = loc => {
-    const k = loc.lat.toFixed(2) + ',' + loc.lon.toFixed(2);
+    const k = Number(loc.lat).toFixed(2) + ',' + Number(loc.lon).toFixed(2);
     if (!(k in wxCache)) wxCache[k] = weatherBubble(loc);
     const wx = wxCache[k];
     if (r.items.length) return cards(r.items, wx, rt.items);
@@ -406,17 +407,45 @@ function fmt(t, f) { return Utilities.formatDate(new Date(t), CFG.TZ, f); }
 const WMO = { 0: '晴天', 1: '晴時多雲', 2: '多雲', 3: '陰天', 45: '有霧', 48: '有霧', 51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨',
   61: '小雨', 63: '中雨', 65: '大雨', 66: '凍雨', 67: '凍雨', 71: '小雪', 73: '中雪', 75: '大雪', 80: '陣雨', 81: '陣雨', 82: '大陣雨',
   95: '雷雨', 96: '雷雨', 99: '強烈雷雨' };
+// 天氣：Open-Meteo → 失敗重試一次 → 改用 wttr.in → 再不行用今天稍早（準備時）存下來的
 function weather(w) {
+  const key = 'WX_' + Number(w.lat).toFixed(2) + ',' + Number(w.lon).toFixed(2), today = todayStr();
+  const got = openMeteo(w) || (Utilities.sleep(2000), openMeteo(w)) || wttr(w);
+  if (got) { jset(key, { d: today, w: got }); return got; }
+  const c = jget(key, null);
+  if (c && c.d === today) { console.warn('天氣即時抓不到，用今天稍早存的'); return c.w; }
+  console.error('天氣三個來源都失敗：' + (w.name || key));
+  return null;
+}
+function openMeteo(w) {
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + w.lat + '&longitude=' + w.lon +
     '&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_min,precipitation_probability_max,uv_index_max' +
     '&timezone=' + encodeURIComponent(CFG.TZ) + '&forecast_days=1';
   try {
     const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (r.getResponseCode() !== 200) { console.warn('天氣 HTTP ' + r.getResponseCode()); return null; }
+    if (r.getResponseCode() !== 200) { console.warn('Open-Meteo HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 150)); return null; }
     const d = JSON.parse(r.getContentText()).daily, g = k => (d[k] || [])[0];
+    if (g('temperature_2m_max') == null) return null;
     return { code: g('weather_code'), max: Math.round(g('temperature_2m_max')), min: Math.round(g('temperature_2m_min')),
       feel: Math.round(g('apparent_temperature_min')), rain: g('precipitation_probability_max') || 0, uv: Math.round(g('uv_index_max') || 0) };
-  } catch (e) { console.warn('天氣 ' + e); return null; }
+  } catch (e) { console.warn('Open-Meteo ' + e); return null; }
+}
+function wttr(w) {
+  try {
+    const r = UrlFetchApp.fetch('https://wttr.in/' + w.lat + ',' + w.lon + '?format=j1&lang=zh-tw', { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) { console.warn('wttr HTTP ' + r.getResponseCode()); return null; }
+    const day = JSON.parse(r.getContentText()).weather[0], hs = day.hourly || [];
+    const noon = hs[4] || hs[0] || {};
+    const desc = ((noon['lang_zh-tw'] || noon.lang_zh || [])[0] || {}).value || '';
+    return { code: null, desc, max: Number(day.maxtempC), min: Number(day.mintempC),
+      feel: Math.min.apply(null, hs.map(h => Number(h.FeelsLikeC)).concat([Number(day.mintempC)])),
+      rain: Math.max.apply(null, hs.map(h => Number(h.chanceofrain) || 0).concat([0])), uv: Number(day.uvIndex) || 0 };
+  } catch (e) { console.warn('wttr ' + e); return null; }
+}
+// 準備時先把每個人的天氣抓一次存著，推播時抓不到還有備份
+function prefetchWeather() {
+  const seen = {};
+  [CFG.WEATHER].concat(Object.values(jget('USERS', {}))).forEach(l => { const k = Number(l.lat).toFixed(2) + ',' + Number(l.lon).toFixed(2); if (!seen[k]) { seen[k] = 1; weather(l); } });
 }
 function clothing(w) {
   const t = w.max, tips = [];
@@ -430,7 +459,7 @@ function weatherBubble(loc) {
   loc = loc || CFG.WEATHER;
   const w = weather(loc);
   if (!w) return null;
-  const desc = WMO[w.code] || '';
+  const desc = w.desc || WMO[w.code] || '';
   const row = (k, v) => ({ type: 'box', layout: 'horizontal', margin: 'md', contents: [
     { type: 'text', text: k, size: 'xl', color: '#666666', flex: 3 }, { type: 'text', text: v, size: 'xl', weight: 'bold', color: '#111111', flex: 5, wrap: true }] });
   return { type: 'bubble', size: 'giga', body: { type: 'box', layout: 'vertical', paddingAll: '20px', contents: [
