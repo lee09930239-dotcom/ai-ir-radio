@@ -66,6 +66,18 @@ function prepare() {
 function preview() { const r = build(); console.log(JSON.stringify(r.items, null, 2)); console.log('候選 ' + r.candidates + ' 則，摘要方式：' + r.mode); }
 function testSend() { dailyNews(true); }
 
+// ===== 新功能上線公告：群發給所有好友（只發一次；想再發一次就跑 announce）=====
+const ANNOUNCE_TEXT = '📍 新功能：天氣跟著你走\n\n' +
+  '從現在起，每天早上第一張卡片是「你所在地」的天氣和穿衣建議。\n\n' +
+  '① 第一次請先傳任何一句話給我（例如「嗨」），完成登記，不然之後會收不到新聞喔！\n' +
+  '② 想用所在地的天氣：按左下「＋」→「位置資訊」→ 傳送\n' +
+  '③ 換地方了就再傳一次位置，隔天早上就會用新地點，每天換都可以\n\n' +
+  '沒傳過位置的話，預設是台北市北投區的天氣。';
+function announce() {
+  const c = pushAll([{ type: 'text', text: ANNOUNCE_TEXT }]);
+  if (c < 300) { setProp('ANNOUNCED_V7', '1'); console.log('✅ 已群發新功能公告'); }
+}
+
 function dailyNews(force) {
   const today = todayStr(), test = force === true;
   if (!test && prop('LAST_SENT') === today) return;   // 一天只推一次
@@ -85,7 +97,12 @@ function dailyNews(force) {
   };
   if (!r.items.length) alertMail('今天抓不到新聞（Google 新聞和備用來源都失敗），已改推早安訊息。');
   let ok = 0, code = 0;
-  if (!uids.length) { code = pushAll(msgsFor(CFG.WEATHER)); if (code < 300) ok = 1; }
+  if (!uids.length) {
+    // 還沒人登記：群發。新功能公告沒發過的話，跟著今天的新聞一起發（同一次推播，不多算則數）
+    const m = msgsFor(CFG.WEATHER), ann = !prop('ANNOUNCED_V7') && !test;
+    code = pushAll(ann ? m.concat([{ type: 'text', text: ANNOUNCE_TEXT }]) : m);
+    if (code < 300) { ok = 1; if (ann) setProp('ANNOUNCED_V7', '1'); }
+  }
   else uids.forEach(u => { const c = lineApi('message/push', { to: u, messages: msgsFor(users[u]) }); if (c < 300) ok++; else code = c; });
   if (ok) {
     setProp('LAST_SENT', today);

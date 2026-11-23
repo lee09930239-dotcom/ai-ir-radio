@@ -21,7 +21,7 @@ function load_() {
   }
   if (!code) code = readBackup_(props);
   if (!code) throw new Error('GitHub 抓不到程式，也沒有備份。請確認網路後再執行一次。');
-  return new Function(code + '\nreturn { setup, preview, testSend, dailyNews, prepare, doPost };')();
+  return new Function(code + '\nreturn { setup, preview, testSend, dailyNews, prepare, doPost, announce };')();
 }
 function saveBackup_(props, code) {
   const n = Math.ceil(code.length / 2500), o = { SRC_BAK_N: String(n) };
@@ -41,6 +41,7 @@ function testSend() { load_().testSend(); }
 function dailyNews() { load_().dailyNews(); }
 function prepare() { load_().prepare(); }
 function doPost(e) { return load_().doPost(e); }   // LINE 傳訊息進來（換天氣地點）
+function announce() { load_().announce(); }   // 群發新功能公告
 function refreshCode() { CacheService.getScriptCache().remove('SRC'); load_(); console.log('✅ 已抓最新版程式'); }
 
 // 不會被執行：只是讓 Google 知道程式需要哪些權限（程式碼是從 GitHub 載入的，Google 看不到）
