@@ -1,5 +1,5 @@
 /**
- * 每日國際新聞（給媽媽） v7  2026-11-22
+ * 每日國際新聞（給媽媽） v8  2026-11-23（加台灣民生・經濟 5 則）
  * 每天早上：第一張是當地天氣＋穿衣建議，接著是全世界的新聞（中英日 Google 新聞 → 去重 → Gemini 挑選、翻成中文摘要）
  * → 用大字卡片推到 LINE 官方帳號。每個人傳一次「位置資訊」就會用那裡的天氣。
  *
@@ -13,7 +13,8 @@
  */
 
 const CFG = {
-  COUNT: 10,                // 每天幾則
+  COUNT: 10,
+  TW_COUNT: 5,              // 台灣民生・經濟新聞幾則                // 每天幾則
   SUMMARY_CHARS: 80,        // 每則摘要大約幾個字
   MAX_AGE_HOURS: 30,        // 只收多久以內的新聞
   REMEMBER_DAYS: 4,         // 推過的新聞記住幾天（這幾天內不會再推同一件事）
@@ -28,6 +29,12 @@ const CFG = {
     ['國際・英文', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en'],
     ['財經・英文', 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en'],
     ['國際・日文', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=ja&gl=JP&ceid=JP:ja'],
+  ],
+  // 台灣民生・經濟區塊的來源
+  TW_FEEDS: [
+    ['台灣', 'https://news.google.com/rss/headlines/section/topic/NATION?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
+    ['財經', 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
+    ['頭條', 'https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
   ],
   // 備用來源：Google 新聞抓不到（少於 10 則）時才用
   BACKUP_FEEDS: [
@@ -49,20 +56,28 @@ const CFG = {
  *   推播失敗或全部來源都抓不到時，寄 Gmail 通知你。 */
 function setup() {
   ScriptApp.getProjectTriggers().filter(t => ['dailyNews', 'prepare'].indexOf(t.getHandlerFunction()) >= 0).forEach(t => ScriptApp.deleteTrigger(t));
-  [CFG.HOUR - 2, CFG.HOUR - 1].forEach(h => ScriptApp.newTrigger('prepare').timeBased().atHour(h).everyDays(1).inTimezone(CFG.TZ).create());
+  [CFG.HOUR - 3, CFG.HOUR - 2, CFG.HOUR - 1].forEach(h => ScriptApp.newTrigger('prepare').timeBased().atHour(h).everyDays(1).inTimezone(CFG.TZ).create());
   [CFG.HOUR, CFG.HOUR + 1].forEach(h => ScriptApp.newTrigger('dailyNews').timeBased().atHour(h).everyDays(1).inTimezone(CFG.TZ).create());
   ['LINE_TOKEN', 'GEMINI_KEY'].forEach(k => { if (!prop(k)) console.warn('⚠️ 還沒設定指令碼屬性 ' + k); });
-  console.log('✅ 排程已建立：' + (CFG.HOUR - 2) + '、' + (CFG.HOUR - 1) + ' 點準備，' + CFG.HOUR + ' 點推播，' + (CFG.HOUR + 1) + ' 點備援（台灣時間）');
+  console.log('✅ 排程已建立：' + (CFG.HOUR - 3) + '～' + (CFG.HOUR - 1) + ' 點準備，' + CFG.HOUR + ' 點推播，' + (CFG.HOUR + 1) + ' 點備援（台灣時間）');
 }
 function todayStr() { return Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd'); }
+// 每次只準備一個還沒好的區塊（國際、台灣各要 3 分鐘左右，一次做兩個會超過 6 分鐘上限）
 function prepare() {
   const today = todayStr();
-  if (prop('LAST_SENT') === today || (prop('PREP_DATE') === today && jget('PREP', { items: [] }).items.some(x => x.summary))) return;
+  if (prop('LAST_SENT') === today) return;
+  const good = k => prop(k + '_DATE') === today && jget(k, { items: [] }).items.some(x => x.summary);
   try {
-    const r = build();
-    if (r.items.length) { jset('PREP', r); setProp('PREP_DATE', today); console.log('✅ 已準備 ' + r.items.length + ' 則（' + r.mode + '）'); }
+    if (!good('PREP')) {
+      const r = build();
+      if (r.items.length) { jset('PREP', r); setProp('PREP_DATE', today); console.log('✅ 國際已準備 ' + r.items.length + ' 則（' + r.mode + '）'); }
+    } else if (!good('PREP_TW')) {
+      const r = build(true, jget('PREP', { items: [] }).items.map(x => x.event || x.title));
+      if (r.items.length) { jset('PREP_TW', r); setProp('PREP_TW_DATE', today); console.log('✅ 台灣已準備 ' + r.items.length + ' 則（' + r.mode + '）'); }
+    }
   } catch (e) { console.error('prepare ' + e); }
 }
+function previewTw() { const r = build(true); console.log(JSON.stringify(r.items, null, 2)); console.log('候選 ' + r.candidates + ' 則，摘要方式：' + r.mode); }
 function preview() { const r = build(); console.log(JSON.stringify(r.items, null, 2)); console.log('候選 ' + r.candidates + ' 則，摘要方式：' + r.mode); }
 function testSend() { dailyNews(true); }
 
@@ -82,17 +97,19 @@ function dailyNews(force) {
   const today = todayStr(), test = force === true;
   if (!test && prop('LAST_SENT') === today) return;   // 一天只推一次
   let r = null;
-  if (!test && prop('PREP_DATE') === today) r = jget('PREP', null);              // 5、6 點準備好的
+  if (prop('PREP_DATE') === today) r = jget('PREP', null);              // 4～6 點準備好的
   if (!r || !r.items || !r.items.length) {
     try { r = test ? build() : titlesOnly(); } catch (e) { console.error(e); r = { items: [] }; }   // 排程時沒準備好：只推標題，不等 Gemini
   }
+  let rt = prop('PREP_TW_DATE') === today ? jget('PREP_TW', null) : null;      // 台灣區塊
+  if (!rt || !rt.items || !rt.items.length) { try { rt = titlesOnly(true); } catch (e) { console.error(e); rt = { items: [] }; } }
   // 每個人用自己的天氣地點分開推；還沒有人登記過（沒傳過訊息）就用預設地點群發
   const users = jget('USERS', {}), uids = Object.keys(users), wxCache = {};
   const msgsFor = loc => {
     const k = loc.lat.toFixed(2) + ',' + loc.lon.toFixed(2);
     if (!(k in wxCache)) wxCache[k] = weatherBubble(loc);
     const wx = wxCache[k];
-    if (r.items.length) return cards(r.items, wx);
+    if (r.items.length) return cards(r.items, wx, rt.items);
     return (wx ? [{ type: 'flex', altText: '今日天氣', contents: wx }] : []).concat([{ type: 'text', text: '☀️ 早安！今天的新聞整理暫時出不來，可以點這裡看最新國際新聞：\nhttps://news.google.com/home?hl=zh-TW&gl=TW&ceid=TW:zh-Hant' }]);
   };
   if (!r.items.length) alertMail('今天抓不到新聞（Google 新聞和備用來源都失敗），已改推早安訊息。');
@@ -106,15 +123,15 @@ function dailyNews(force) {
   else uids.forEach(u => { const c = lineApi('message/push', { to: u, messages: msgsFor(users[u]) }); if (c < 300) ok++; else code = c; });
   if (ok) {
     setProp('LAST_SENT', today);
-    if (r.items.length) remember(r.items);
+    if (r.items.length) remember(r.items.concat(rt.items));
     console.log('✅ 已推播 ' + r.items.length + ' 則給 ' + (uids.length ? ok + '/' + uids.length + ' 人' : '所有好友') + '（' + r.mode + '）');
     if (uids.length && ok < uids.length) alertMail('有 ' + (uids.length - ok) + ' 個人推播失敗（HTTP ' + code + '），請看執行記錄。');
   } else alertMail('LINE 推播失敗（HTTP ' + code + '）。' + (new Date().getHours() < CFG.HOUR + 1 ? CFG.HOUR + 1 + ' 點會再試一次。' : '今天已經沒有備援了，請看執行記錄。') + '\n常見原因：LINE_TOKEN 錯誤、本月免費則數用完。');
 }
-function titlesOnly() {
-  const cands = dedupe(fetchAll());
+function titlesOnly(tw) {
+  const cands = dedupe(tw ? fetchCandidates(CFG.TW_FEEDS) : fetchAll());
   const tr = t => { if (/[\u4e00-\u9fff]/.test(t) && !/[\u3040-\u30ff]/.test(t)) return t; try { return LanguageApp.translate(t, '', 'zh-TW'); } catch (e) { return t; } };
-  return { items: mix(cands, CFG.COUNT).map(c => ({ title: tr(c.title), summary: '', oneline: '', src: c.src, time: c.time, link: c.link, orig: c.title, event: c.title })), candidates: cands.length, mode: '僅標題（備案）' };
+  return { items: mix(cands, tw ? CFG.TW_COUNT : CFG.COUNT).map(c => ({ title: tr(c.title), summary: '', oneline: '', src: c.src, time: c.time, link: c.link, orig: c.title, event: c.title })), candidates: cands.length, mode: '僅標題（備案）' };
 }
 function fetchAll() {
   let all = fetchCandidates(CFG.FEEDS);
@@ -183,21 +200,28 @@ function remember(items) {
 }
 
 // ===== 3. Gemini 挑新聞＋寫摘要 =====
-function build() {
-  const start = Date.now();
-  const all = fetchAll();
-  const cands = mix(dedupe(all), 40);
+function build(tw, exclude) {
+  const start = Date.now(), N = tw ? CFG.TW_COUNT : CFG.COUNT;
+  const all = tw ? fetchCandidates(CFG.TW_FEEDS) : fetchAll();
+  const cands = mix(dedupe(all), tw ? 35 : 40);
   console.log('抓到新聞 ' + all.length + ' 則，去重後 ' + cands.length + ' 則');
   if (!cands.length) return { items: [], candidates: 0, mode: '無' };
   const pastEvents = jget('SEEN', []).map(x => x.t).slice(-40);
   const list = cands.map((c, i) => i + '. [' + c.cat + '] ' + c.title + '（' + c.src + '，' + fmt(c.time, 'MM/dd HH:mm') + '）' +
     (c.related.length ? '\n   相關報導：' + c.related.join('／') : '')).join('\n');
-  const prompt =
+  const rules = tw ?
+    '你是幫長輩整理每日新聞的編輯。以下是過去一天的台灣新聞標題。\n' +
+    '請挑出最重要的 ' + N + ' 則「台灣國內」新聞，規則：\n' +
+    '- 以民生和經濟為主：物價、油電瓦斯價格、薪資、稅、健保與長照、交通、房市、補助與新政策、台股與匯率、會影響生活的天災。\n' +
+    '- 不要國際新聞（另一區已經有了），也不要政治口水、娛樂、八卦、社會案件。\n' +
+    (exclude && exclude.length ? '- 這些今天國際區已經選了，不要重複：' + exclude.join('／') + '\n' : '')
+    :
     '你是幫長輩整理每日新聞的編輯。以下是過去一天的新聞標題，來自台灣、美國、日本的媒體（有中文、英文、日文）。\n' +
-    '請挑出最重要的 ' + CFG.COUNT + ' 則，規則：\n' +
+    '請挑出最重要的 ' + N + ' 則，規則：\n' +
     '- 以國際大事為主：各國重大事件、美國政府動向、戰爭與外交、國際經濟。\n' +
     '- 至少要有 1 則股市或金融市場（美股、台股、匯率、利率）。\n' +
-    '- 台灣國內新聞最多 1 則，而且必須是全國性的重大事件。\n' +
+    '- 不要選台灣國內新聞（另外有台灣區塊），除非是全世界都在報導的大事。\n';
+  const prompt = rules +
     '- 不要娛樂、八卦、社會案件、廣告、天氣小事。\n' +
     '- 優先選全世界都在關注的大事，不要只選台灣媒體的角度。同一件事有中文報導就用中文那則的編號。\n' +
     '- 同一件事只能選一則（不同語言講同一件事也算同一件）。下面這些是前幾天已經推過的，不要再選同一件事（除非有重大新進展）：\n  ' + (pastEvents.join('／') || '（無）') + '\n' +
@@ -224,9 +248,9 @@ function build() {
     if (text) break;
   }
   if (!text) {   // Gemini 全部失敗：退回只推標題，至少媽媽還是收得到
-    return { items: cands.slice(0, CFG.COUNT).map(c => ({ title: c.title, summary: '', oneline: '', src: c.src, time: c.time, link: c.link, event: c.title })), candidates: cands.length, mode: '僅標題（Gemini 失敗）' };
+    return { items: cands.slice(0, N).map(c => ({ title: c.title, summary: '', oneline: '', src: c.src, time: c.time, link: c.link, event: c.title })), candidates: cands.length, mode: '僅標題（Gemini 失敗）' };
   }
-  const picked = parseJson(text).filter(p => cands[p.no]).slice(0, CFG.COUNT)
+  const picked = parseJson(text).filter(p => cands[p.no]).slice(0, N)
     .map(p => Object.assign({}, p, { orig: cands[p.no].title, src: cands[p.no].src, time: cands[p.no].time, link: cands[p.no].link }));
   return { items: picked, candidates: cands.length, mode };
 }
@@ -255,12 +279,10 @@ function parseJson(t) {
 }
 
 // ===== 4. 大字卡片 =====
-function cards(items, wx) {
-  const d = new Date(), wk = '日一二三四五六'[Number(Utilities.formatDate(d, CFG.TZ, 'u')) % 7];
-  const head = Utilities.formatDate(d, CFG.TZ, 'M/d') + '（' + wk + '）今日國際新聞';
-  const bubbles = items.map((it, i) => {
+function newsBubbles(items, label, color) {
+  return items.map((it, i) => {
     const body = [
-      { type: 'text', text: (i + 1) + ' / ' + items.length + '・' + (it.src || '') + '・' + fmt(it.time, 'M/d HH:mm'), size: 'md', color: '#666666', wrap: true },
+      { type: 'text', text: label + ' ' + (i + 1) + ' / ' + items.length + '・' + (it.src || '') + '・' + fmt(it.time, 'M/d HH:mm'), size: 'md', color: '#666666', wrap: true },
       { type: 'text', text: it.title, size: 'xxl', weight: 'bold', wrap: true, color: '#111111', margin: 'md' },
     ];
     if (it.summary) body.push({ type: 'text', text: it.summary, size: 'xl', wrap: true, color: '#222222', margin: 'lg', lineSpacing: '6px' });
@@ -268,13 +290,22 @@ function cards(items, wx) {
       contents: [{ type: 'text', text: '👉 ' + it.oneline, size: 'xl', weight: 'bold', wrap: true, color: '#7A4B00' }] });
     const b = { type: 'bubble', size: 'giga', body: { type: 'box', layout: 'vertical', paddingAll: '20px', contents: body } };
     if (/^https:\/\//.test(it.link || '')) b.footer = { type: 'box', layout: 'vertical', contents: [
-      { type: 'button', style: 'primary', color: '#0B3D91', height: 'md', action: { type: 'uri', label: '看原文', uri: it.link } }] };
+      { type: 'button', style: 'primary', color: color, height: 'md', action: { type: 'uri', label: '看原文', uri: it.link } }] };
     return b;
   });
-  return [
-    { type: 'text', text: '☀️ 早安！' + head + '\n共 ' + items.length + ' 則，往左滑看下一則。' },
-    { type: 'flex', altText: head + '：' + items.map(x => x.title).join('、').slice(0, 300), contents: { type: 'carousel', contents: (wx ? [wx] : []).concat(bubbles).slice(0, 12) } },
+}
+function cards(items, wx, twItems) {
+  const d = new Date(), wk = '日一二三四五六'[Number(Utilities.formatDate(d, CFG.TZ, 'u')) % 7];
+  const day = Utilities.formatDate(d, CFG.TZ, 'M/d') + '（' + wk + '）';
+  const tw = twItems || [];
+  const out = [
+    { type: 'text', text: '☀️ 早安！' + day + '\n第一張是今天的天氣，接著是 ' + items.length + ' 則國際新聞' + (tw.length ? '，最後是 ' + tw.length + ' 則台灣民生・經濟新聞' : '') + '。往左滑看下一則。' },
+    { type: 'flex', altText: day + '天氣＋國際新聞：' + items.map(x => x.title).join('、').slice(0, 300),
+      contents: { type: 'carousel', contents: (wx ? [wx] : []).concat(newsBubbles(items, '🌏 國際', '#0B3D91')).slice(0, 12) } },
   ];
+  if (tw.length) out.push({ type: 'flex', altText: day + '台灣民生・經濟：' + tw.map(x => x.title).join('、').slice(0, 300),
+    contents: { type: 'carousel', contents: newsBubbles(tw, '🇹🇼 台灣', '#1B7F3B').slice(0, 12) } });
+  return out;
 }
 
 // ===== 5. LINE 推播（broadcast：所有加好友的人都收到）=====
