@@ -70,8 +70,8 @@ function testSend() { dailyNews(true); }
 const ANNOUNCE_TEXT = '📍 新功能：天氣跟著你走\n\n' +
   '從現在起，每天早上第一張卡片是「你所在地」的天氣和穿衣建議。\n\n' +
   '① 第一次請先傳任何一句話給我（例如「嗨」），完成登記，不然之後會收不到新聞喔！\n' +
-  '② 想用所在地的天氣：按左下「＋」→「位置資訊」→ 傳送\n' +
-  '③ 換地方了就再傳一次位置，隔天早上就會用新地點，每天換都可以\n\n' +
+  '② 想換成所在地的天氣：直接打「天氣 地名」，例如「天氣 東京」\n' +
+  '③ 換地方了就再傳一次，隔天早上就會用新地點，每天換都可以\n\n' +
   '沒傳過位置的話，預設是台北市北投區的天氣。';
 function announce() {
   const c = pushAll([{ type: 'text', text: ANNOUNCE_TEXT }]);
@@ -301,15 +301,39 @@ function doPost(e) {
       if (ev.type === 'message' && ev.message.type === 'location') {
         users[u] = { name: placeName(ev.message.address, ev.message.title), lat: ev.message.latitude, lon: ev.message.longitude };
         text = '📍 天氣地點已改成：' + users[u].name + '\n明天早上開始用這裡的天氣。換地方的時候，再傳一次位置就好。';
+      } else if (ev.type === 'message' && ev.message.type === 'text' && /^(天氣|地點|位置)\s*[:：]?\s*\S/.test(ev.message.text.trim())) {
+        // 打字換地點：「天氣 東京」「天氣 北投」
+        const q = ev.message.text.trim().replace(/^(天氣|地點|位置)\s*[:：]?\s*/, '').slice(0, 20);
+        const g = geocode(q);
+        if (g) { users[u] = g; text = '📍 天氣地點已改成：' + g.name + (g.where ? '（' + g.where + '）' : '') + '\n明天早上開始用這裡的天氣。換地方的時候，再傳一次「天氣 地名」就好。'; }
+        else text = '找不到「' + q + '」這個地方 🙏\n可以換個寫法再試一次，例如「天氣 東京」「天氣 台北市北投區」，\n或按左下「＋」→「位置資訊」直接傳位置。';
       } else if (ev.type === 'follow' || ev.type === 'message') {
         text = (isNew ? '✅ 已登記，每天早上 7 點會收到天氣和國際新聞。\n' : '') +
-          '目前的天氣地點：' + users[u].name + '\n\n想換地點：按左下「＋」→「位置資訊」→ 傳送目前位置。';
+          '目前的天氣地點：' + users[u].name + '\n\n想換地點：直接打「天氣 地名」，例如「天氣 東京」。\n（也可以按左下「＋」→「位置資訊」傳目前位置）';
       }
       if (text && ev.replyToken) lineApi('message/reply', { replyToken: ev.replyToken, messages: [{ type: 'text', text }] });
     });
     jset('USERS', users);
   } catch (err) { console.error('doPost ' + err); }
   return ContentService.createTextOutput('OK');
+}
+// 地名 → 經緯度（Open-Meteo 地名搜尋，免費）。中文找不到就翻成英文再找一次
+function geocode(q) {
+  const find = name => {
+    try {
+      const r = UrlFetchApp.fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&format=json&name=' + encodeURIComponent(name), { muteHttpExceptions: true });
+      const x = r.getResponseCode() === 200 ? (JSON.parse(r.getContentText()).results || [])[0] : null;
+      return x ? { name: q, lat: x.latitude, lon: x.longitude, where: [x.country, x.admin1].filter(Boolean).join('・') } : null;
+    } catch (e) { console.warn('geocode ' + e); return null; }
+  };
+  // 例：「台北市北投區」→ 台北市北投區、北投區、北投
+  const last = q.replace(/^.+?[市縣県都府](?=.{2,})/, ''), names = [];
+  [q, last, last.replace(/(市|區|区|縣|県|府|都|町)$/, '')].forEach(n => { if (n.length >= 2 && names.indexOf(n) < 0) names.push(n); });
+  for (const n of names) { const g = find(n); if (g) return g; }
+  for (const n of names.slice(-1)) {
+    try { const en = LanguageApp.translate(n, '', 'en').replace(/ (City|District|Prefecture|Ward)$/i, ''); if (en && en !== n) { const g = find(en); if (g) return g; } } catch (e) {}
+  }
+  return null;
 }
 function placeName(addr, title) {
   const a = String(addr || '');
