@@ -20,7 +20,7 @@ const CFG = {
   MAX_AGE_HOURS: 30,        // 只收多久以內的新聞
   REMEMBER_DAYS: 4,         // 推過的新聞記住幾天（這幾天內不會再推同一件事）
   HOUR: 7,                  // 每天幾點推（台灣時間；實際會在 7:00～7:59 之間）
-  MODELS: ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-flash-lite-latest'],   // 第一個失敗就換下一個
+  MODELS: ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.8-flash'],   // 第一個失敗就換下一個。lite 最快（約 5 秒），大模型偶爾會卡超過 6 分鐘，所以放後面
   USE_SEARCH: false,        // true＝先讓 Gemini 用 Google 搜尋確認內容（免費帳號常被擋 429，所以預設關）
   FEEDS: [
     ['國際', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
