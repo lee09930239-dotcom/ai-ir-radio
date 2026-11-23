@@ -67,12 +67,16 @@ function todayStr() { return Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-d
 function prepare() {
   const today = todayStr();
   if (prop('LAST_SENT') === today) return;
+  try { prefetchWeather(); } catch (e) { console.warn('prefetch ' + e); }
   const good = k => prop(k + '_DATE') === today && jget(k, { items: [] }).items.some(x => x.summary);
+  // 國際做完如果還剩時間（例如 Gemini 很快回），同一次接著做台灣
+  const t0 = Date.now();
   try {
     if (!good('PREP')) {
       const r = build();
       if (r.items.length) { jset('PREP', r); setProp('PREP_DATE', today); console.log('✅ 國際已準備 ' + r.items.length + ' 則（' + r.mode + '）'); }
-    } else if (!good('PREP_TW')) {
+    }
+    if (good('PREP') && !good('PREP_TW') && Date.now() - t0 < 120e3) {
       const r = build(true, jget('PREP', { items: [] }).items.map(x => x.event || x.title));
       if (r.items.length) { jset('PREP_TW', r); setProp('PREP_TW_DATE', today); console.log('✅ 台灣已準備 ' + r.items.length + ' 則（' + r.mode + '）'); }
     }
@@ -111,7 +115,7 @@ function dailyNews(force) {
   // 每個人用自己的天氣地點分開推；還沒有人登記過（沒傳過訊息）就用預設地點群發
   const users = jget('USERS', {}), uids = Object.keys(users), wxCache = {};
   const msgsFor = loc => {
-    const k = loc.lat.toFixed(2) + ',' + loc.lon.toFixed(2);
+    const k = Number(loc.lat).toFixed(2) + ',' + Number(loc.lon).toFixed(2);
     if (!(k in wxCache)) wxCache[k] = weatherBubble(loc);
     const wx = wxCache[k];
     if (r.items.length) return cards(r.items, wx, rt.items);
@@ -250,7 +254,11 @@ function build(tw, exclude) {
   for (const useSearch of (CFG.USE_SEARCH ? [true, false] : [false])) {
     for (const m of CFG.MODELS) {
       if ((Date.now() - start) / 1000 > CFG.GEMINI_BUDGET_SEC) { console.warn('時間快不夠了，不再換模型'); break; }
-      text = gemini(m, prompt + (useSearch ? '\n\n可以用 Google 搜尋確認新聞內容後再寫摘要。' : '\n\n重要：摘要只能用上面標題和相關報導裡「明寫」的事實，不可以自己補地名、數字、原因或細節；資訊不夠就只寫一兩句。標題看不懂在講什麼的新聞不要選。'), useSearch);
+      for (let k = 0; k < 2 && !(text && parseJson(text)); k++) {
+        if (k && LAST_GEMINI_CODE !== 503 && LAST_GEMINI_CODE !== 500) break;   // 只有「伺服器忙」才值得等一下再試
+        if (k) { console.log(m + ' 伺服器忙，15 秒後再試一次'); Utilities.sleep(15000); }
+        text = gemini(m, prompt + (useSearch ? '\n\n可以用 Google 搜尋確認新聞內容後再寫摘要。' : '\n\n重要：摘要只能用上面標題和相關報導裡「明寫」的事實，不可以自己補地名、數字、原因或細節；資訊不夠就只寫一兩句。標題看不懂在講什麼的新聞不要選。'), useSearch);
+      }
       if (text && parseJson(text)) { mode = m + (useSearch ? '＋搜尋' : '＋僅標題'); break; }
       text = null;
       Utilities.sleep(3000);   // 太快重試容易被擋 429
@@ -264,7 +272,9 @@ function build(tw, exclude) {
     .map(p => Object.assign({}, p, { orig: cands[p.no].title, src: cands[p.no].src, time: cands[p.no].time, link: cands[p.no].link }));
   return { items: picked, candidates: cands.length, mode };
 }
+let LAST_GEMINI_CODE = 0;
 function gemini(model, prompt, useSearch, plain) {
+  LAST_GEMINI_CODE = 0;
   // 先叫它「少想一點」（回應快很多）；這個模型不支援這個設定 (400) 就改用一般方式再問一次
   const gc = plain ? { temperature: 0.3 } : { temperature: 0.3, thinkingConfig: { thinkingLevel: 'low' } };
   const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: gc };
@@ -275,6 +285,7 @@ function gemini(model, prompt, useSearch, plain) {
     const r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true,
       headers: { 'x-goog-api-key': prop('GEMINI_KEY') }, payload: JSON.stringify(body) });
+    LAST_GEMINI_CODE = r.getResponseCode();
     if (r.getResponseCode() === 400 && !plain) { console.log(model + ' 不支援少想模式，改一般模式'); return gemini(model, prompt, useSearch, true); }
     if (r.getResponseCode() !== 200) { console.warn('Gemini ' + model + (useSearch ? ' 搜尋' : '') + ' HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 300)); return null; }
     console.log(model + ' 回應 ' + Math.round((Date.now() - t0) / 1000) + ' 秒');
@@ -409,17 +420,45 @@ function fmt(t, f) { return Utilities.formatDate(new Date(t), CFG.TZ, f); }
 const WMO = { 0: '晴天', 1: '晴時多雲', 2: '多雲', 3: '陰天', 45: '有霧', 48: '有霧', 51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨',
   61: '小雨', 63: '中雨', 65: '大雨', 66: '凍雨', 67: '凍雨', 71: '小雪', 73: '中雪', 75: '大雪', 80: '陣雨', 81: '陣雨', 82: '大陣雨',
   95: '雷雨', 96: '雷雨', 99: '強烈雷雨' };
+// 天氣：Open-Meteo → 失敗重試一次 → 改用 wttr.in → 再不行用今天稍早（準備時）存下來的
 function weather(w) {
+  const key = 'WX_' + Number(w.lat).toFixed(2) + ',' + Number(w.lon).toFixed(2), today = todayStr();
+  const got = openMeteo(w) || (Utilities.sleep(2000), openMeteo(w)) || wttr(w);
+  if (got) { jset(key, { d: today, w: got }); return got; }
+  const c = jget(key, null);
+  if (c && c.d === today) { console.warn('天氣即時抓不到，用今天稍早存的'); return c.w; }
+  console.error('天氣三個來源都失敗：' + (w.name || key));
+  return null;
+}
+function openMeteo(w) {
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + w.lat + '&longitude=' + w.lon +
     '&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_min,precipitation_probability_max,uv_index_max' +
     '&timezone=' + encodeURIComponent(CFG.TZ) + '&forecast_days=1';
   try {
     const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (r.getResponseCode() !== 200) { console.warn('天氣 HTTP ' + r.getResponseCode()); return null; }
+    if (r.getResponseCode() !== 200) { console.warn('Open-Meteo HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 150)); return null; }
     const d = JSON.parse(r.getContentText()).daily, g = k => (d[k] || [])[0];
+    if (g('temperature_2m_max') == null) return null;
     return { code: g('weather_code'), max: Math.round(g('temperature_2m_max')), min: Math.round(g('temperature_2m_min')),
       feel: Math.round(g('apparent_temperature_min')), rain: g('precipitation_probability_max') || 0, uv: Math.round(g('uv_index_max') || 0) };
-  } catch (e) { console.warn('天氣 ' + e); return null; }
+  } catch (e) { console.warn('Open-Meteo ' + e); return null; }
+}
+function wttr(w) {
+  try {
+    const r = UrlFetchApp.fetch('https://wttr.in/' + w.lat + ',' + w.lon + '?format=j1&lang=zh-tw', { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) { console.warn('wttr HTTP ' + r.getResponseCode()); return null; }
+    const day = JSON.parse(r.getContentText()).weather[0], hs = day.hourly || [];
+    const noon = hs[4] || hs[0] || {};
+    const desc = ((noon['lang_zh-tw'] || noon.lang_zh || [])[0] || {}).value || '';
+    return { code: null, desc, max: Number(day.maxtempC), min: Number(day.mintempC),
+      feel: Math.min.apply(null, hs.map(h => Number(h.FeelsLikeC)).concat([Number(day.mintempC)])),
+      rain: Math.max.apply(null, hs.map(h => Number(h.chanceofrain) || 0).concat([0])), uv: Number(day.uvIndex) || 0 };
+  } catch (e) { console.warn('wttr ' + e); return null; }
+}
+// 準備時先把每個人的天氣抓一次存著，推播時抓不到還有備份
+function prefetchWeather() {
+  const seen = {};
+  [CFG.WEATHER].concat(Object.values(jget('USERS', {}))).forEach(l => { const k = Number(l.lat).toFixed(2) + ',' + Number(l.lon).toFixed(2); if (!seen[k]) { seen[k] = 1; weather(l); } });
 }
 function clothing(w) {
   const t = w.max, tips = [];
@@ -433,7 +472,7 @@ function weatherBubble(loc) {
   loc = loc || CFG.WEATHER;
   const w = weather(loc);
   if (!w) return null;
-  const desc = WMO[w.code] || '';
+  const desc = w.desc || WMO[w.code] || '';
   const row = (k, v) => ({ type: 'box', layout: 'horizontal', margin: 'md', contents: [
     { type: 'text', text: k, size: 'xl', color: '#666666', flex: 3 }, { type: 'text', text: v, size: 'xl', weight: 'bold', color: '#111111', flex: 5, wrap: true }] });
   return { type: 'bubble', size: 'giga', body: { type: 'box', layout: 'vertical', paddingAll: '20px', contents: [
