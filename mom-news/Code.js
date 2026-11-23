@@ -102,6 +102,10 @@ function dailyNews(force) {
     try { r = test ? build() : titlesOnly(); } catch (e) { console.error(e); r = { items: [] }; }   // 排程時沒準備好：只推標題，不等 Gemini
   }
   let rt = prop('PREP_TW_DATE') === today ? jget('PREP_TW', null) : null;      // 台灣區塊
+  const worldReady = prop('PREP_DATE') === today;
+  if ((!rt || !rt.items || !rt.items.length) && test && worldReady) {      // 測試時國際已經準備好，就現場請 Gemini 寫台灣（時間夠）
+    try { rt = build(true, r.items.map(x => x.event || x.title)); jset('PREP_TW', rt); setProp('PREP_TW_DATE', today); } catch (e) { console.error(e); }
+  }
   if (!rt || !rt.items || !rt.items.length) { try { rt = titlesOnly(true); } catch (e) { console.error(e); rt = { items: [] }; } }
   // 每個人用自己的天氣地點分開推；還沒有人登記過（沒傳過訊息）就用預設地點群發
   const users = jget('USERS', {}), uids = Object.keys(users), wxCache = {};
@@ -131,6 +135,11 @@ function dailyNews(force) {
 function titlesOnly(tw) {
   const cands = dedupe(tw ? fetchCandidates(CFG.TW_FEEDS) : fetchAll());
   const tr = t => { if (/[\u4e00-\u9fff]/.test(t) && !/[\u3040-\u30ff]/.test(t)) return t; try { return LanguageApp.translate(t, '', 'zh-TW'); } catch (e) { return t; } };
+  if (tw) {   // 只有標題時，用關鍵字挑民生・經濟相關的放前面
+    const kw = /物價|漲價|降價|油價|電價|瓦斯|水價|薪|基本工資|勞|稅|健保|長照|年金|補助|津貼|普發|房|租|股|匯率|央行|利率|通膨|CPI|交通|捷運|高鐵|台鐵|機票|颱風|地震|停電|停水|食安|疫苗|醫療|物流|超商|就業|失業/;
+    cands.sort((a, b) => (kw.test(b.title) ? 1 : 0) - (kw.test(a.title) ? 1 : 0));
+    return { items: cands.slice(0, CFG.TW_COUNT).map(c => ({ title: c.title, summary: '', oneline: '', src: c.src, time: c.time, link: c.link, orig: c.title, event: c.title })), candidates: cands.length, mode: '僅標題（備案）' };
+  }
   return { items: mix(cands, tw ? CFG.TW_COUNT : CFG.COUNT).map(c => ({ title: tr(c.title), summary: '', oneline: '', src: c.src, time: c.time, link: c.link, orig: c.title, event: c.title })), candidates: cands.length, mode: '僅標題（備案）' };
 }
 function fetchAll() {
