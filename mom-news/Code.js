@@ -8,7 +8,7 @@
  *   GEMINI_KEY  = Google AI Studio 的 API 金鑰
  *   HOOK_KEY    = （建議）webhook 密碼；設了之後 LINE 後台 Webhook URL 要改成「…/exec?k=這組密碼」
  *
- * 第一次：選 setup 按「執行」（會建立每天 7 點的排程）。
+ * 第一次：選 setup 按「執行」（會建立每天 6 點的排程）。
  * 測試：  選 preview 執行 → 只在執行記錄裡看結果，不推播。
  *         選 testSend 執行 → 真的推一次到 LINE。
  */
@@ -19,7 +19,7 @@ const CFG = {
   SUMMARY_CHARS: 80,        // 每則摘要大約幾個字
   MAX_AGE_HOURS: 30,        // 只收多久以內的新聞
   REMEMBER_DAYS: 4,         // 推過的新聞記住幾天（這幾天內不會再推同一件事）
-  HOUR: 7,                  // 每天幾點推（台灣時間；實際會在 7:00～7:59 之間）
+  HOUR: 6,                  // 每天幾點推（台灣時間；Google 排程會在 6:00～6:30 左右跑）
   MODELS: ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.8-flash'],   // 第一個失敗就換下一個。lite 最快（約 5 秒），大模型偶爾會卡超過 6 分鐘，所以放後面
   USE_SEARCH: false,        // true＝先讓 Gemini 用 Google 搜尋確認內容（免費帳號常被擋 429，所以預設關）
   FEEDS: [
@@ -51,14 +51,14 @@ const CFG = {
 
 // ===== 排程與測試 =====
 /* 每天的流程（台灣時間）：
- *   5 點、6 點：prepare  先抓新聞＋Gemini 寫好摘要存起來（6 點那次如果 5 點已經做好就跳過）
- *   7 點：dailyNews      推播。有準備好的就推準備好的；沒有就「只推標題」（不等 Gemini，一定推得出去）
- *   8 點：dailyNews      備援。7 點成功就跳過；7 點失敗就再推一次
+ *   3、4、5 點：prepare  先抓新聞＋Gemini 寫好摘要存起來（已經做好的就跳過）
+ *   6 點：dailyNews      推播。有準備好的就推準備好的；沒有就「只推標題」（不等 Gemini，一定推得出去）
+ *   7 點：dailyNews      備援。6 點成功就跳過；6 點失敗就再推一次
  *   推播失敗或全部來源都抓不到時，寄 Gmail 通知你。 */
 function setup() {
   ScriptApp.getProjectTriggers().filter(t => ['dailyNews', 'prepare'].indexOf(t.getHandlerFunction()) >= 0).forEach(t => ScriptApp.deleteTrigger(t));
   [CFG.HOUR - 3, CFG.HOUR - 2, CFG.HOUR - 1].forEach(h => ScriptApp.newTrigger('prepare').timeBased().atHour(h).everyDays(1).inTimezone(CFG.TZ).create());
-  [CFG.HOUR, CFG.HOUR + 1].forEach(h => ScriptApp.newTrigger('dailyNews').timeBased().atHour(h).everyDays(1).inTimezone(CFG.TZ).create());
+  [CFG.HOUR, CFG.HOUR + 1].forEach(h => ScriptApp.newTrigger('dailyNews').timeBased().atHour(h).nearMinute(15).everyDays(1).inTimezone(CFG.TZ).create());   // nearMinute(15)：大約整點～半點之間，不會拖到快 7 點
   ['LINE_TOKEN', 'GEMINI_KEY'].forEach(k => { if (!prop(k)) console.warn('⚠️ 還沒設定指令碼屬性 ' + k); });
   console.log('✅ 排程已建立：' + (CFG.HOUR - 3) + '～' + (CFG.HOUR - 1) + ' 點準備，' + CFG.HOUR + ' 點推播，' + (CFG.HOUR + 1) + ' 點備援（台灣時間）');
 }
@@ -102,7 +102,7 @@ function dailyNews(force) {
   const today = todayStr(), test = force === true;
   if (!test && prop('LAST_SENT') === today) return;   // 一天只推一次
   let r = null;
-  if (prop('PREP_DATE') === today) r = jget('PREP', null);              // 4～6 點準備好的
+  if (prop('PREP_DATE') === today) r = jget('PREP', null);              // 3～5 點準備好的
   if (!r || !r.items || !r.items.length) {
     try { r = test ? build() : titlesOnly(); } catch (e) { console.error(e); r = { items: [] }; }   // 排程時沒準備好：只推標題，不等 Gemini
   }
@@ -365,7 +365,7 @@ function doPost(e) {
         if (g) { users[u] = g; text = '📍 天氣地點已改成：' + g.name + (g.where ? '（' + g.where + '）' : '') + '\n明天早上開始用這裡的天氣。換地方的時候，再傳一次「天氣 地名」就好。'; }
         else text = '找不到「' + q + '」這個地方 🙏\n可以換個寫法再試一次，例如「天氣 東京」「天氣 台北市北投區」，\n或按左下「＋」→「位置資訊」直接傳位置。';
       } else if (ev.type === 'follow' || ev.type === 'message') {
-        text = (isNew ? '✅ 已登記，每天早上 7 點會收到天氣和國際新聞。\n' : '') +
+        text = (isNew ? '✅ 已登記，每天早上 6 點多會收到天氣和新聞。\n' : '') +
           '目前的天氣地點：' + users[u].name + '\n\n想換地點：直接打「天氣 地名」，例如「天氣 東京」。\n（也可以按左下「＋」→「位置資訊」傳目前位置）';
       }
       if (text && ev.replyToken) lineApi('message/reply', { replyToken: ev.replyToken, messages: [{ type: 'text', text }] });
