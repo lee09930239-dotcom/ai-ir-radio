@@ -103,11 +103,15 @@ function dailyNews(force) {
   if (!test && prop('LAST_SENT') === today) return;   // 一天只推一次
   let r = null;
   if (prop('PREP_DATE') === today) r = jget('PREP', null);              // 0～5 點準備好的
+  // 補發時，如果準備好的那份沒有摘要（Gemini 當時失敗），就現場重寫一次
+  if (test && r && r.items && !r.items.some(x => x.summary)) r = null;
   if (!r || !r.items || !r.items.length) {
-    try { r = test ? build() : titlesOnly(); } catch (e) { console.error(e); r = { items: [] }; }   // 排程時沒準備好：只推標題，不等 Gemini
+    try { r = test ? build() : titlesOnly(); } catch (e) { console.error(e); r = { items: [] }; }
+    if (test && r.items.some(x => x.summary)) { jset('PREP', r); setProp('PREP_DATE', today); }   // 補發寫好的存起來，下次不用再寫
   }
   let rt = prop('PREP_TW_DATE') === today ? jget('PREP_TW', null) : null;      // 台灣區塊
-  const worldReady = prop('PREP_DATE') === today;
+  const worldReady = r.items.some(x => x.summary);
+  if (test && rt && rt.items && !rt.items.some(x => x.summary)) rt = null;   // 補發時台灣那份沒摘要也重寫
   if ((!rt || !rt.items || !rt.items.length) && test && worldReady) {      // 測試時國際已經準備好，就現場請 Gemini 寫台灣（時間夠）
     try { rt = build(true, r.items.map(x => x.event || x.title)); jset('PREP_TW', rt); setProp('PREP_TW_DATE', today); } catch (e) { console.error(e); }
   }
