@@ -20,7 +20,7 @@ const CFG = {
   MAX_AGE_HOURS: 30,        // 只收多久以內的新聞
   REMEMBER_DAYS: 4,         // 推過的新聞記住幾天（這幾天內不會再推同一件事）
   HOUR: 6,                  // 每天幾點推（台灣時間；Google 排程會在 6:00～6:30 左右跑）
-  MODELS: ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.8-flash'],   // 第一個失敗就換下一個。lite 最快（約 5 秒），大模型偶爾會卡超過 6 分鐘，所以放後面
+  MODELS: ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.8-flash'],   // 第一個失敗就換下一個。lite 最快（約 5 秒），大模型偶爾會卡超過 6 分鐘，所以放後面
   USE_SEARCH: false,        // true＝先讓 Gemini 用 Google 搜尋確認內容（免費帳號常被擋 429，所以預設關）
   FEEDS: [
     ['國際', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
@@ -51,16 +51,16 @@ const CFG = {
 
 // ===== 排程與測試 =====
 /* 每天的流程（台灣時間）：
- *   3、4、5 點：prepare  先抓新聞＋Gemini 寫好摘要存起來（已經做好的就跳過）
+ *   0～5 點每小時：prepare  先抓新聞＋Gemini 寫好摘要存起來（已經做好的就跳過；Gemini 忙線就下一小時再試）
  *   6 點：dailyNews      推播。有準備好的就推準備好的；沒有就「只推標題」（不等 Gemini，一定推得出去）
  *   7 點：dailyNews      備援。6 點成功就跳過；6 點失敗就再推一次
  *   推播失敗或全部來源都抓不到時，寄 Gmail 通知你。 */
 function setup() {
   ScriptApp.getProjectTriggers().filter(t => ['dailyNews', 'prepare'].indexOf(t.getHandlerFunction()) >= 0).forEach(t => ScriptApp.deleteTrigger(t));
-  [CFG.HOUR - 3, CFG.HOUR - 2, CFG.HOUR - 1].forEach(h => ScriptApp.newTrigger('prepare').timeBased().atHour(h).everyDays(1).inTimezone(CFG.TZ).create());
+  [6, 5, 4, 3, 2, 1].map(n => CFG.HOUR - n).forEach(h => ScriptApp.newTrigger('prepare').timeBased().atHour(h).everyDays(1).inTimezone(CFG.TZ).create());
   [CFG.HOUR, CFG.HOUR + 1].forEach(h => ScriptApp.newTrigger('dailyNews').timeBased().atHour(h).nearMinute(15).everyDays(1).inTimezone(CFG.TZ).create());   // nearMinute(15)：大約整點～半點之間，不會拖到快 7 點
   ['LINE_TOKEN', 'GEMINI_KEY'].forEach(k => { if (!prop(k)) console.warn('⚠️ 還沒設定指令碼屬性 ' + k); });
-  console.log('✅ 排程已建立：' + (CFG.HOUR - 3) + '～' + (CFG.HOUR - 1) + ' 點準備，' + CFG.HOUR + ' 點推播，' + (CFG.HOUR + 1) + ' 點備援（台灣時間）');
+  console.log('✅ 排程已建立：' + (CFG.HOUR - 6) + '～' + (CFG.HOUR - 1) + ' 點準備，' + CFG.HOUR + ' 點推播，' + (CFG.HOUR + 1) + ' 點備援（台灣時間）');
 }
 function todayStr() { return Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd'); }
 // 每次只準備一個還沒好的區塊（國際、台灣各要 3 分鐘左右，一次做兩個會超過 6 分鐘上限）
@@ -102,7 +102,7 @@ function dailyNews(force) {
   const today = todayStr(), test = force === true;
   if (!test && prop('LAST_SENT') === today) return;   // 一天只推一次
   let r = null;
-  if (prop('PREP_DATE') === today) r = jget('PREP', null);              // 3～5 點準備好的
+  if (prop('PREP_DATE') === today) r = jget('PREP', null);              // 0～5 點準備好的
   if (!r || !r.items || !r.items.length) {
     try { r = test ? build() : titlesOnly(); } catch (e) { console.error(e); r = { items: [] }; }   // 排程時沒準備好：只推標題，不等 Gemini
   }
@@ -137,9 +137,18 @@ function dailyNews(force) {
     if (uids.length && ok < uids.length) alertMail('有 ' + (uids.length - ok) + ' 個人推播失敗（HTTP ' + code + '），請看執行記錄。');
   } else alertMail('LINE 推播失敗（HTTP ' + code + '）。' + (new Date().getHours() < CFG.HOUR + 1 ? CFG.HOUR + 1 + ' 點會再試一次。' : '今天已經沒有備援了，請看執行記錄。') + '\n常見原因：LINE_TOKEN 錯誤、本月免費則數用完。');
 }
+// 標題翻成繁中（Gemini 失敗時用）：LanguageApp → 失敗再用 Google 翻譯網址
+function tr(t) {
+  if (/[\u4e00-\u9fff]/.test(t) && !/[\u3040-\u30ff]/.test(t)) return t;
+  try { const x = LanguageApp.translate(t, '', 'zh-TW'); if (x && x !== t) return x; } catch (e) { console.warn('translate ' + e); }
+  try {
+    const r = UrlFetchApp.fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-TW&dt=t&q=' + encodeURIComponent(t), { muteHttpExceptions: true });
+    if (r.getResponseCode() === 200) { const x = JSON.parse(r.getContentText())[0].map(a => a[0]).join(''); if (x) return x; }
+  } catch (e) { console.warn('gtx ' + e); }
+  return t;
+}
 function titlesOnly(tw) {
   const cands = dedupe(tw ? fetchCandidates(CFG.TW_FEEDS) : fetchAll());
-  const tr = t => { if (/[\u4e00-\u9fff]/.test(t) && !/[\u3040-\u30ff]/.test(t)) return t; try { return LanguageApp.translate(t, '', 'zh-TW'); } catch (e) { return t; } };
   if (tw) {   // 只有標題時，用關鍵字挑民生・經濟相關的放前面
     const kw = /物價|漲價|降價|油價|電價|瓦斯|水價|薪|基本工資|勞|稅|健保|長照|年金|補助|津貼|普發|房|租|通膨|CPI|交通|捷運|高鐵|台鐵|機票|颱風|地震|停電|停水|食安|疫苗|醫療|物流|超商|就業|失業/;
     cands.sort((a, b) => (kw.test(b.title) ? 1 : 0) - (kw.test(a.title) ? 1 : 0));
@@ -257,7 +266,7 @@ function build(tw, exclude) {
       if ((Date.now() - start) / 1000 > CFG.GEMINI_BUDGET_SEC) { console.warn('時間快不夠了，不再換模型'); break; }
       for (let k = 0; k < 2 && !(text && parseJson(text)); k++) {
         if (k && LAST_GEMINI_CODE !== 503 && LAST_GEMINI_CODE !== 500) break;   // 只有「伺服器忙」才值得等一下再試
-        if (k) { console.log(m + ' 伺服器忙，15 秒後再試一次'); Utilities.sleep(15000); }
+        if (k) { console.log(m + ' 伺服器忙，20 秒後再試一次'); Utilities.sleep(20000); }
         text = gemini(m, prompt + (useSearch ? '\n\n可以用 Google 搜尋確認新聞內容後再寫摘要。' : '\n\n重要：摘要只能用上面標題和相關報導裡「明寫」的事實，不可以自己補地名、數字、原因或細節；資訊不夠就只寫一兩句。標題看不懂在講什麼的新聞不要選。'), useSearch);
       }
       if (text && parseJson(text)) { mode = m + (useSearch ? '＋搜尋' : '＋僅標題'); break; }
@@ -267,7 +276,7 @@ function build(tw, exclude) {
     if (text) break;
   }
   if (!text) {   // Gemini 全部失敗：退回只推標題，至少媽媽還是收得到
-    return { items: cands.slice(0, N).map(c => ({ title: c.title, summary: '', oneline: '', src: c.src, time: c.time, link: c.link, event: c.title })), candidates: cands.length, mode: '僅標題（Gemini 失敗）' };
+    return { items: mix(cands, N).map(c => ({ title: tw ? c.title : tr(c.title), orig: c.title, summary: '', oneline: '', src: c.src, time: c.time, link: c.link, event: c.title })), candidates: cands.length, mode: '僅標題（Gemini 失敗）' };
   }
   const picked = parseJson(text).filter(p => cands[p.no]).slice(0, N)
     .map(p => Object.assign({}, p, { orig: cands[p.no].title, src: cands[p.no].src, time: cands[p.no].time, link: cands[p.no].link }));
@@ -424,7 +433,8 @@ const WMO = { 0: '晴天', 1: '晴時多雲', 2: '多雲', 3: '陰天', 45: '有
 // 天氣：Open-Meteo → 失敗重試一次 → 改用 wttr.in → 再不行用今天稍早（準備時）存下來的
 function weather(w) {
   const key = 'WX_' + Number(w.lat).toFixed(2) + ',' + Number(w.lon).toFixed(2), today = todayStr();
-  const got = openMeteo(w) || (Utilities.sleep(2000), openMeteo(w)) || wttr(w);
+  const skip = prop('OM_BLOCKED') === today;   // Open-Meteo 今天額度已用完就不再試，直接用 wttr.in
+  const got = (!skip && (openMeteo(w) || (prop('OM_BLOCKED') !== today && (Utilities.sleep(2000), openMeteo(w))))) || wttr(w);
   if (got) { jset(key, { d: today, w: got }); return got; }
   const c = jget(key, null);
   if (c && c.d === today) { console.warn('天氣即時抓不到，用今天稍早存的'); return c.w; }
@@ -437,7 +447,11 @@ function openMeteo(w) {
     '&timezone=' + encodeURIComponent(CFG.TZ) + '&forecast_days=1';
   try {
     const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (r.getResponseCode() !== 200) { console.warn('Open-Meteo HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 150)); return null; }
+    if (r.getResponseCode() !== 200) {
+      console.warn('Open-Meteo HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 150));
+      if (/Daily API request limit/i.test(r.getContentText())) setProp('OM_BLOCKED', todayStr());
+      return null;
+    }
     const d = JSON.parse(r.getContentText()).daily, g = k => (d[k] || [])[0];
     if (g('temperature_2m_max') == null) return null;
     return { code: g('weather_code'), max: Math.round(g('temperature_2m_max')), min: Math.round(g('temperature_2m_min')),
