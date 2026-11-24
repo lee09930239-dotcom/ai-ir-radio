@@ -24,8 +24,7 @@ const CFG = {
   USE_SEARCH: false,        // true＝先讓 Gemini 用 Google 搜尋確認內容（免費帳號常被擋 429，所以預設關）
   FEEDS: [
     ['國際', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
-    ['財經', 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
-    ['頭條', 'https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant'],
+    // 台灣財經、台灣頭條不放國際區（台股新聞會擠進來），它們在下面的台灣區
     // 全世界的新聞：英文（美國版）和日文，Gemini 會翻成中文
     ['國際・英文', 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en'],
     ['財經・英文', 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en'],
@@ -141,6 +140,8 @@ function dailyNews(force) {
     if (uids.length && ok < uids.length) alertMail('有 ' + (uids.length - ok) + ' 個人推播失敗（HTTP ' + code + '），請看執行記錄。');
   } else alertMail('LINE 推播失敗（HTTP ' + code + '）。' + (new Date().getHours() < CFG.HOUR + 1 ? CFG.HOUR + 1 + ' 點會再試一次。' : '今天已經沒有備援了，請看執行記錄。') + '\n常見原因：LINE_TOKEN 錯誤、本月免費則數用完。');
 }
+// 民生・經濟關鍵字（Gemini 失敗或選不滿時，用來挑台灣新聞）
+const TW_KW = /物價|漲價|降價|油價|電價|瓦斯|水價|薪|基本工資|勞|稅|健保|長照|年金|補助|津貼|普發|房|租|通膨|CPI|交通|捷運|高鐵|台鐵|機票|颱風|地震|停電|停水|食安|疫苗|醫療|物流|超商|就業|失業/;
 // 標題翻成繁中（Gemini 失敗時用）：LanguageApp → 失敗再用 Google 翻譯網址
 function tr(t) {
   if (/[\u4e00-\u9fff]/.test(t) && !/[\u3040-\u30ff]/.test(t)) return t;
@@ -154,7 +155,7 @@ function tr(t) {
 function titlesOnly(tw) {
   const cands = dedupe(tw ? fetchCandidates(CFG.TW_FEEDS) : fetchAll());
   if (tw) {   // 只有標題時，用關鍵字挑民生・經濟相關的放前面
-    const kw = /物價|漲價|降價|油價|電價|瓦斯|水價|薪|基本工資|勞|稅|健保|長照|年金|補助|津貼|普發|房|租|通膨|CPI|交通|捷運|高鐵|台鐵|機票|颱風|地震|停電|停水|食安|疫苗|醫療|物流|超商|就業|失業/;
+    const kw = TW_KW;
     cands.sort((a, b) => (kw.test(b.title) ? 1 : 0) - (kw.test(a.title) ? 1 : 0));
     return { items: cands.slice(0, CFG.TW_COUNT).map(c => ({ title: c.title, summary: '', oneline: '', src: c.src, time: c.time, link: c.link, orig: c.title, event: c.title })), candidates: cands.length, mode: '僅標題（備案）' };
   }
@@ -247,9 +248,11 @@ function build(tw, exclude) {
     '你是幫長輩整理每日新聞的編輯。以下是過去一天的新聞標題，來自台灣、美國、日本的媒體（有中文、英文、日文）。\n' +
     '請挑出最重要的 ' + N + ' 則，規則：\n' +
     '- 以國際大事為主：各國重大事件、美國政府動向、戰爭與外交、國際經濟。\n' +
-    '- 至少要有 1 則股市或金融市場（美股、台股、匯率、利率）。\n' +
+    '- 股市・金融市場最多 2 則，只選美股或全球市場（例如美國利率、國際油價）。\n' +
+    '- 台股、台灣個股、台灣公司、台灣財經的新聞一律不要選（台灣區另外有）。\n' +
     '- 不要選台灣國內新聞（另外有台灣區塊），除非是全世界都在報導的大事。\n';
-  const prompt = rules +
+  const must = '- 一定要剛好選滿 ' + N + ' 則，不能少。\n';
+  const prompt = rules + must +
     '- 不要娛樂、八卦、社會案件、廣告、天氣小事。\n' +
     '- 優先選全世界都在關注的大事，不要只選台灣媒體的角度。同一件事有中文報導就用中文那則的編號。\n' +
     '- 同一件事只能選一則（不同語言講同一件事也算同一件）。下面這些是前幾天已經推過的，不要再選同一件事（除非有重大新進展）：\n  ' + (pastEvents.join('／') || '（無）') + '\n' +
@@ -284,6 +287,15 @@ function build(tw, exclude) {
   }
   const picked = parseJson(text).filter(p => cands[p.no]).slice(0, N)
     .map(p => Object.assign({}, p, { orig: cands[p.no].title, src: cands[p.no].src, time: cands[p.no].time, link: cands[p.no].link }));
+  // Gemini 選不滿就用剩下的候選補（只有標題），則數不會變少
+  if (picked.length < N) {
+    const used = {}; parseJson(text).forEach(p => used[p.no] = 1);
+    let rest = cands.filter((c, i) => !used[i]);
+    if (tw) rest.sort((a, b) => (TW_KW.test(b.title) ? 1 : 0) - (TW_KW.test(a.title) ? 1 : 0));
+    else rest = rest.filter(c => !/台股|加權|櫃買|台積電|台指/.test(c.title));
+    console.warn('Gemini 只選了 ' + picked.length + ' 則，用標題補到 ' + N + ' 則');
+    rest.slice(0, N - picked.length).forEach(c => picked.push({ title: tw ? c.title : tr(c.title), summary: '', oneline: '', orig: c.title, src: c.src, time: c.time, link: c.link, event: c.title }));
+  }
   return { items: picked, candidates: cands.length, mode };
 }
 let LAST_GEMINI_CODE = 0;
