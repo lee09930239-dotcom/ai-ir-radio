@@ -287,9 +287,28 @@ function build(tw, exclude) {
   }
   const picked = parseJson(text).filter(p => cands[p.no]).slice(0, N)
     .map(p => Object.assign({}, p, { orig: cands[p.no].title, src: cands[p.no].src, time: cands[p.no].time, link: cands[p.no].link }));
-  // Gemini 選不滿就用剩下的候選補（只有標題），則數不會變少
+  // Gemini 選不滿：先請 Gemini 從剩下的再補選（規則放寬），還是不夠才用標題補
+  if (picked.length < N && (Date.now() - start) / 1000 < CFG.GEMINI_BUDGET_SEC) {
+    const usedNo = {}; picked.forEach(p => usedNo[p.no] = 1);
+    const K = N - picked.length;
+    const restList = cands.map((c, i) => usedNo[i] ? null : i + '. ' + c.title + '（' + c.src + '）').filter(Boolean).join('\n');
+    const more = '你是幫長輩整理每日新聞的編輯。已經選了這些：' + picked.map(p => p.title).join('／') + '\n' +
+      '請從下面清單「再選 ' + K + ' 則」不同事件的' + (tw ? '台灣' : '國際') + '新聞，一定要剛好 ' + K + ' 則。' +
+      (tw ? '民生・經濟優先；不夠的話，其他重要的台灣新聞（政策、交通、天氣、醫療、教育等）也可以，只是不要八卦娛樂、台股以外的個股。\n' : '國際大事優先，不要台股、台灣公司。\n') +
+      '每則寫 title（25 字內）、summary（約 ' + CFG.SUMMARY_CHARS + ' 字，只寫標題裡明寫的事實）、oneline（20 字內）、event（10 字內）、no（編號），全部台灣繁體中文。' +
+      '只輸出 JSON 陣列：[{"no":0,"title":"","summary":"","oneline":"","event":""}]\n\n清單：\n' + restList;
+    for (const m of CFG.MODELS) {
+      const t2 = gemini(m, more, false), add = t2 && parseJson(t2);
+      if (add) {
+        add.filter(p => cands[p.no] && !usedNo[p.no]).slice(0, K).forEach(p => { usedNo[p.no] = 1; picked.push(Object.assign({}, p, { orig: cands[p.no].title, src: cands[p.no].src, time: cands[p.no].time, link: cands[p.no].link })); });
+        console.log('Gemini 補選後共 ' + picked.length + ' 則');
+        break;
+      }
+      if ((Date.now() - start) / 1000 > CFG.GEMINI_BUDGET_SEC) break;
+    }
+  }
   if (picked.length < N) {
-    const used = {}; parseJson(text).forEach(p => used[p.no] = 1);
+    const used = {}; picked.forEach(p => used[p.no] = 1);
     let rest = cands.filter((c, i) => !used[i]);
     if (tw) rest.sort((a, b) => (TW_KW.test(b.title) ? 1 : 0) - (TW_KW.test(a.title) ? 1 : 0));
     else rest = rest.filter(c => !/台股|加權|櫃買|台積電|台指/.test(c.title));
