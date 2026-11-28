@@ -105,5 +105,15 @@ for(const [t,cs] of DATA){
   }
 }
 </script>
+<script>
+/* 使用統計(2026-11-28):只送「功能名稱・匿名代號」，不送任何內容 */
+(()=>{const URL_='https://script.google.com/macros/s/AKfycbzKk8YCyvvTMJu0lCRPtWY7fDAL96fP2xO8o27F_55DKs1xdhbU9jeqQEsOs-r2aEM/exec';if(!URL_)return;const P='radio';let u='',off=false;
+try{off=localStorage.getItem('stats_off')==='1';u=localStorage.getItem('stats_uid')||'';if(!u){u=Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(16).padStart(2,'0')).join('');localStorage.setItem('stats_uid',u)}}catch(e){u=u||Math.random().toString(16).slice(2,14)}
+const q=[],last={},V='';const add=f=>{if(off||!f)return;f=String(f).slice(0,40);const t=Date.now();if(t-(last[f]||0)<30000)return;last[f]=t;q.push({p:P,f:f,u:u,b:V})};
+const flush=()=>{if(!q.length)return;try{navigator.sendBeacon(URL_,JSON.stringify({items:q.splice(0,50)}))}catch(e){}};
+window.statsAdd=add;window.statsOff=v=>{off=!!v;try{localStorage.setItem('stats_off',v?'1':'')}catch(e){}};add('開啟');
+document.addEventListener('click',e=>{try{const a=e.target.closest('a');if(!a)return;const co=a.closest('.co');const n=co?co.querySelector('b').textContent:'';add(a.classList.contains('pk')?'精選・'+a.textContent.replace(/^▶ /,'').split('　')[0]:(a.textContent.trim()+(n?'・'+n:'')))}catch(x){}},true);
+setInterval(flush,60000);addEventListener('pagehide',flush);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flush()});})();
+</script>
 </body>
 </html>
