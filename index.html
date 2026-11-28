@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>法說電台</title>
 <meta name="theme-color" content="#0f172a">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -13,7 +13,11 @@
 :root{--bg:#f8fafc;--fg:#0f172a;--mut:#64748b;--card:#fff;--line:#e2e8f0;--acc:#2563eb}
 @media(prefers-color-scheme:dark){:root{--bg:#0f172a;--fg:#e2e8f0;--mut:#94a3b8;--card:#1e293b;--line:#334155;--acc:#60a5fa}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:0 16px 40px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) calc(40px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));overscroll-behavior-x:none;overflow-wrap:break-word}
+/* iPhone 瀏海・左右空白對策 */
+html,body{overflow-x:hidden}@supports(overflow:clip){html,body{overflow-x:clip}}
+.ver{text-align:center;margin-top:20px}.ver button{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--card);color:var(--acc);padding:6px 12px;border-radius:8px;margin-left:6px}
+.ver button.new{background:var(--acc);color:#fff}
 main{max-width:760px;margin:0 auto}
 h1{font-size:1.4rem;margin:20px 0 4px}
 .sub{color:var(--mut);font-size:.9rem;margin:0 0 16px}
@@ -36,6 +40,7 @@ a.pk small{display:block;opacity:.85}
 <div id="picks"></div>
 <div id="dir"></div>
 <p class="note">IR 連結為各公司官方入口，部分需要註冊。</p>
+<p class="note ver">版本 <span id="ver"></span><button id="upd" type="button">🔄 更新版本</button></p>
 </main>
 <script>
 // 精選：[公司, 標題, YouTube 連結, 起始秒數, 語言]
@@ -104,6 +109,12 @@ for(const [t,cs] of DATA){
     l.append(a,y);e.prepend(b,s);e.append(l);dir.append(e);
   }
 }
+// 版本號與更新按鈕
+const VERSION='2026-11-28a';
+document.getElementById('ver').textContent=VERSION;
+const upd=document.getElementById('upd');
+upd.onclick=()=>location.replace(location.pathname+'?v='+Date.now());
+fetch(location.pathname+'?t='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{const v=(t.match(/const VERSION='([^']+)'/)||[])[1];if(v&&v>VERSION){upd.classList.add('new');upd.textContent='🔄 有新版本，點這裡更新'}}).catch(()=>{});
 </script>
 <script>
 /* 使用統計(2026-11-28):只送「功能名稱・匿名代號」，不送任何內容 */
