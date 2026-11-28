@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0b2440"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style></head><body>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0b2440"><style>:root{padding-top:calc(env(safe-area-inset-top,0px) + 44px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style></head><body>
 <title>直播抽獎台</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -99,7 +99,7 @@ textarea{min-height:130px;resize:vertical;font-size:15px;line-height:1.5}
 .bonus.pop .bonus-word{animation:pop .6s .25s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes pop{from{transform:scale(.2) rotate(-12deg);opacity:0}to{transform:none;opacity:1}}
 .bonus-form{background:rgba(255,255,255,.95);border-radius:16px;padding:12px;display:flex;gap:8px;flex-wrap:wrap;width:100%;max-width:420px;box-sizing:border-box;text-align:left}
-.poster{position:fixed;inset:0;z-index:40;background:linear-gradient(170deg,#0b2440,#1680c4);color:#fff;overflow:auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px}
+.poster{position:fixed;inset:0;z-index:40;background:linear-gradient(170deg,#0b2440,#1680c4);color:#fff;overflow:auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-block:calc(44px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px}
 .poster h3{margin:0;font-family:var(--display);font-weight:800;font-size:44px;color:var(--kelp);line-height:1}
 .poster .pt{font-size:26px;font-weight:900;text-wrap:balance}
 .poster .pm{color:#a9c3dc;font-size:16px}
@@ -148,7 +148,7 @@ tr.redrawn td.s{text-decoration:none}
 .confirm{background:#fff4f2;border:1.5px solid #ffc9c3;border-radius:12px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:700}
 
 /* sheet for export fallback */
-.sheet{position:fixed;inset:0;background:rgba(5,20,38,.8);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));z-index:50}
+.sheet{position:fixed;inset:0;background:rgba(5,20,38,.8);display:flex;align-items:center;justify-content:center;padding:calc(44px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));z-index:50}
 .sheet .card{max-width:560px;width:100%;max-height:100%;overflow:auto}
 /* iPhone 左右空白對策 */
 html{overflow-x:hidden}@supports(overflow:clip){html,body{overflow-x:clip}}body{overscroll-behavior-x:none}
@@ -175,7 +175,7 @@ html{overflow-x:hidden}@supports(overflow:clip){html,body{overflow-x:clip}}body{
 @media (orientation:landscape) and (min-width:600px){
   #draw{display:grid;grid-template-columns:minmax(0,1fr) clamp(240px,30vw,400px);grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"stage top" "stage bottom"}
   #draw .stage{grid-area:stage;margin:max(8px,env(safe-area-inset-top,0px)) 0 max(8px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
-  #draw .top{grid-area:top;overflow:auto;padding-top:max(10px,env(safe-area-inset-top,0px))}
+  #draw .top{grid-area:top;overflow:auto;padding-top:calc(10px + env(safe-area-inset-top,0px))}
   #draw .meta{flex-direction:column;align-items:flex-start;gap:4px}
   #draw .bottom{grid-area:bottom;grid-template-columns:1fr;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
   #draw .endbtn{padding:12px 16px}
@@ -319,7 +319,7 @@ html{overflow-x:hidden}@supports(overflow:clip){html,body{overflow-x:clip}}body{
 
     <button class="btn red big" id="startBtn" data-tour="start">開始抽獎</button>
     <p class="note" id="startHint" style="text-align:center;color:#a9c3dc"></p>
-    <p class="note" style="text-align:center;color:#a9c3dc;margin-top:8px">版本 <span id="appVer"></span> <button class="btn ghost" id="appUpd" type="button" style="display:inline-block;width:auto;min-height:0;padding:6px 12px;margin-left:6px">🔄 更新版本</button></p>
+    <p class="note" style="text-align:center;color:#a9c3dc;margin-top:8px">版本 <span id="appVer"></span> <button class="btn ghost" id="appUpd" type="button" style="display:inline-block;width:auto;min-height:0;padding:6px 12px;min-height:44px;margin-left:6px">🔄 更新版本</button></p>
   </div>
 </section>
 
@@ -965,7 +965,7 @@ loadBg();loadBonus();refreshSetup();renderStyle();if(!LS.get('fl.toured',0))setT
 </script>
 <script>
 // 版本號與更新按鈕
-(()=>{const VERSION='2026-11-28a';const v=document.getElementById('appVer'),b=document.getElementById('appUpd');if(!v||!b)return;v.textContent=VERSION;
+(()=>{const VERSION='2026-11-28b';const v=document.getElementById('appVer'),b=document.getElementById('appUpd');if(!v||!b)return;v.textContent=VERSION;
 b.onclick=()=>location.replace(location.pathname+'?v='+Date.now());
 fetch(location.pathname+'?t='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{const m=(t.match(/const VERSION='([^']+)'/)||[])[1];if(m&&m>VERSION)b.textContent='🔄 有新版本，點這裡更新'}).catch(()=>{});})();
 </script>
